@@ -50,6 +50,9 @@ header h1{font-size:18px;margin:0;flex:1}
 .fr .tag{position:absolute;top:4px;right:4px;background:var(--ok);color:#04311d;font-size:10px;font-weight:700;border-radius:999px;padding:1px 6px}
 .sel{display:flex;align-items:center;gap:10px}
 .sel .grow{flex:1;min-width:0}
+.linkbtn{background:none;border:0;color:var(--cyan,#22d3ee);font:inherit;font-size:13px;padding:8px 0 0;cursor:pointer;text-align:left}
+.num{display:block;width:72px;margin-top:4px;padding:9px 10px;border-radius:10px;border:1px solid var(--line,#2a2f6b);background:rgba(255,255,255,.04);color:inherit;font:inherit}
+.shot .actions{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
 .swatches{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:-4px}
 .sw{width:30px;height:30px;border-radius:50%;background:var(--c);border:2px solid var(--line);cursor:pointer;padding:0;box-shadow:inset 0 0 0 2px var(--night)}
 .sw.on{border-color:#fff}
@@ -82,10 +85,10 @@ header h1{font-size:18px;margin:0;flex:1}
       </div>
       <div class="actions">
         <button class="btn p" id="camBtn">📷 Live camera</button>
-        <button class="btn" id="selfieBtn">🖼️ Upload selfie</button>
+        <button class="btn" id="selfieBtn">🖼️ Photo from gallery</button>
         <button class="btn" id="measureBtn">📏 Measure my size</button>
         <button class="btn" id="captureBtn" disabled>📸 Capture</button>
-        <input type="file" id="selfieIn" accept="image/*" capture="user" hidden>
+        <input type="file" id="selfieIn" accept="image/*" hidden>
       </div>
     </div>
     <div class="side">
@@ -93,6 +96,17 @@ header h1{font-size:18px;margin:0;flex:1}
       <div class="card" id="sizeCard"><span class="muted small">Frame size</span>
         <div id="sizeText" style="margin:4px 0 10px"></div>
         <div class="chips" id="sizeChips" role="group" aria-label="Frame size"></div>
+        <button class="linkbtn" id="exactBtn" type="button">📐 Exact size: enter the numbers from your current glasses</button>
+        <div id="exactBox" hidden style="margin-top:10px">
+          <p class="muted small" style="margin:0 0 8px">Look inside the arm of glasses that fit you well. You'll see numbers like <b>52□18-140</b> (lens width, bridge, arm length).</p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+            <label class="small">Lens<input id="exLens" inputmode="numeric" maxlength="2" placeholder="52" class="num"></label>
+            <label class="small">Bridge<input id="exBridge" inputmode="numeric" maxlength="2" placeholder="18" class="num"></label>
+            <label class="small">PD (optional)<input id="exPd" inputmode="numeric" maxlength="2" placeholder="63" class="num"></label>
+            <button class="btn p" id="exSave" type="button">Use my size</button>
+          </div>
+          <p class="muted small" style="margin:8px 0 0">PD is on your prescription (sometimes written “PD 63”).</p>
+        </div>
         <p class="muted small" id="sizeNone" hidden style="margin:8px 0 0"></p></div>
       <div class="card sel" id="selCard" hidden>
         <div class="grow"><b id="selName"></b><span class="muted small" id="selMeta"></span></div>
@@ -105,10 +119,16 @@ header h1{font-size:18px;margin:0;flex:1}
 </div>
 <div class="shot" id="shot" role="dialog" aria-label="Your try-on photo">
   <img id="shotImg" alt="Your try-on photo">
-  <div class="actions"><button class="btn p" id="shareBtn">Share</button><button class="btn" id="saveBtn">Save</button><button class="btn" id="closeShot">Close</button></div>
+  <div class="actions">
+    <button class="btn p" id="saveBtn">💾 Save to gallery</button>
+    <button class="btn" id="shareBtn">Share</button>
+    <button class="btn" id="useShotBtn">📏 Use this photo for size &amp; frames</button>
+    <button class="btn" id="closeShot">Close</button>
+  </div>
+  <p class="muted small" style="text-align:center;max-width:420px;margin:0">“Use this photo” measures your face from it and shows the frames in your size. Take it facing the camera, without glasses.</p>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <script src="/tryon/face-api.js" defer></script>
-<script src="/tryon/tryon.js?v=6" defer></script>
+<script src="/tryon/tryon.js?v=7" defer></script>
 </body>
 </html>

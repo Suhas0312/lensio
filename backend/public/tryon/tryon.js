@@ -254,7 +254,7 @@
   function autoPose() {
     const f = S.face, fr = S.sel; if (!f || !fr) return null;
     const dx = f.R.x - f.L.x, dy = f.R.y - f.L.y, eye = Math.hypot(dx, dy);
-    const w = eye * ((fr.frameWidthMm || 136) / ((S.measure && S.measure.pd) || 62));   // measured PD → true-to-size
+    const w = eye * ((fr.frameWidthMm || 136) / ((S.measure && S.measure.pd) || 63));   // measured PD → true-to-size
     return { cx: (f.L.x + f.R.x) / 2, cy: (f.L.y + f.R.y) / 2 + eye * 0.06, w, rot: Math.atan2(dy, dx) };
   }
   function currentPose() {
@@ -356,16 +356,43 @@
     const lm = r && r.multiFaceLandmarks && r.multiFaceLandmarks[0];
     if (!lm || lm.length < 478) return { why: 'noface' };
     const P = (i) => ({ x: lm[i].x * W, y: lm[i].y * H }), d = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
-    const irisA = (d(P(469), P(471)) + d(P(470), P(472))) / 2, irisB = (d(P(474), P(476)) + d(P(475), P(477))) / 2;
+    // Horizontal iris width only: eyelids cover the top and bottom of the iris, which made vertical readings
+    // too small and every size too big.
+    const irisA = d(P(469), P(471)), irisB = d(P(474), P(476));
     const iris = (irisA + irisB) / 2;
-    if (iris < 9) return { why: 'far' };                                        // too few pixels for 1 mm accuracy
+    if (iris < (S.mode === 'photo' ? 12 : 14)) return { why: 'far' };            // need enough pixels for ~1 mm
     const l = P(234), rt = P(454), nose = P(1), w = d(l, rt);
-    if (Math.abs(irisA - irisB) / iris > 0.14 || Math.abs(nose.x - (l.x + rt.x) / 2) / w > 0.06) return { why: 'turned' };
+    if (Math.abs(irisA - irisB) / iris > 0.10 || Math.abs(nose.x - (l.x + rt.x) / 2) / w > 0.04) return { why: 'turned' };
+    const tilt = Math.abs(Math.atan2(P(473).y - P(468).y, P(473).x - P(468).x));
+    if (tilt > 0.07 && tilt < Math.PI - 0.07) return { why: 'turned' };              // head tilted sideways
     const mm = IRIS_MM / iris;
     return { pd: d(P(468), P(473)) * mm, face: w * mm };
   }
   const median = (a) => { const s = [...a].sort((x, y) => x - y); return s[Math.floor(s.length / 2)]; };
+  /** Average of the middle half: ignores blinks and odd frames. */
+  const trimmed = (a) => { const s = [...a].sort((x, y) => x - y), k = Math.floor(s.length / 4), m = s.slice(k, s.length - k); return m.reduce((x, y) => x + y, 0) / m.length; };
+  const spread = (a) => { const s = [...a].sort((x, y) => x - y); return s[Math.floor(s.length * 0.75)] - s[Math.floor(s.length * 0.25)]; };
   const HINT = { noface: 'Look at the camera', far: 'Come a little closer', turned: 'Look straight at the camera' };
+
+  /** Saves a size (camera or the customer's own glasses) and filters frames to it. */
+  function applyMeasure(m) {
+    S.measure = m;
+    try { localStorage.setItem('lensio.measure', JSON.stringify({ ...m, at: Date.now() })); } catch { /* private mode */ }
+    S.sizeFilter = m.size;
+  }
+  /** Exact: from the numbers printed inside the arm of glasses that already fit (e.g. 52□18-140). */
+  async function exactFromGlasses() {
+    const lens = +$('#exLens').value, bridge = +$('#exBridge').value, pdIn = +$('#exPd').value;
+    if (!(lens >= 40 && lens <= 62) || !(bridge >= 12 && bridge <= 26)) { toast('Enter the lens (40–62) and bridge (12–26) numbers from your glasses.'); return; }
+    if (pdIn && !(pdIn >= 50 && pdIn <= 78)) { toast('PD is usually between 50 and 78 mm. Leave it empty if unsure.'); return; }
+    const width = 2 * lens + bridge + 12;                                       // + end pieces ≈ total frame width
+    applyMeasure({ face: width, pd: pdIn || null, size: sizeFor(width), photo: false, source: 'glasses', lens, bridge });
+    $('#exactBox').hidden = true;
+    renderSize(); renderStrip();
+    const first = orderedFrames()[0];
+    if (S.sel && !hasSize(S.sel, S.sizeFilter) && first) await select(first.id); else if (S.sel) showSel(S.sel);
+    place(); toast(`Your size: ${SIZE_LABEL[S.measure.size]}`);
+  }
 
   async function measure() {
     if (S.measuring) return;
@@ -380,22 +407,21 @@
         const r = sampleFrom(await meshOnce(fm, photo), photo.naturalWidth, photo.naturalHeight);
         if (r.pd) samples.push(r); else { toast(r.why === 'far' ? 'Use a closer, sharper selfie.' : 'Use a front-facing selfie, eyes open, no glasses.'); }
       } else {
-        const until = Date.now() + 12000; let last = '';
-        while (samples.length < 24 && Date.now() < until && S.mode === 'live') {
+        const NEED = 40, until = Date.now() + 20000; let last = '';
+        while (samples.length < NEED && Date.now() < until && S.mode === 'live') {
           const r = sampleFrom(await meshOnce(fm, video), video.videoWidth, video.videoHeight);
           if (r.pd) samples.push(r); else last = r.why;
-          st(samples.length ? `Measuring… keep still ${Math.round(samples.length / 24 * 100)}%` : `${HINT[last] || 'Measuring…'} · remove glasses`);
+          st(samples.length ? `Measuring… keep still ${Math.round(samples.length / NEED * 100)}%` : `${HINT[last] || 'Measuring…'} · remove glasses`);
           await new Promise((res) => setTimeout(res, 60));
         }
-        if (samples.length < 8) toast('Could not measure. Remove your glasses, face the camera in good light, and try again.');
+        if (samples.length < 16) { toast('Could not measure. Remove your glasses, face the camera in good light, and try again.'); samples.length = 0; }
+        else if (spread(samples.map((s) => s.pd)) > 2.5) { toast('You moved a little. Keep still and tap Measure again for an exact reading.'); samples.length = 0; }
       }
       if (samples.length >= (S.mode === 'photo' ? 1 : 8)) {
-        const face = median(samples.map((s) => s.face)), pd = median(samples.map((s) => s.pd));
+        const face = trimmed(samples.map((s) => s.face)), pd = trimmed(samples.map((s) => s.pd));
         if (pd < 50 || pd > 78 || face < 110 || face > 170) toast('That measurement looks off. Try again in better light, facing the camera.');
         else {
-          S.measure = { face: Math.round(face), pd: Math.round(pd), size: sizeFor(face), photo: S.mode === 'photo' };
-          try { localStorage.setItem('lensio.measure', JSON.stringify({ ...S.measure, at: Date.now() })); } catch { /* private mode */ }
-          S.sizeFilter = S.measure.size;
+          applyMeasure({ face: Math.round(face), pd: Math.round(pd), size: sizeFor(face), photo: S.mode === 'photo', source: 'camera' });
           renderSize(); renderStrip();
           const first = orderedFrames()[0];
           if (S.sel && !hasSize(S.sel, S.sizeFilter) && first) await select(first.id);   // switch to a frame in their size
@@ -414,7 +440,9 @@
   function renderSize() {
     const m = S.measure;
     $('#sizeText').innerHTML = m
-      ? `Face width <b>${m.face} mm</b> · PD <b>${m.pd} mm</b><br>Your size: <b>${SIZE_LABEL[m.size]}</b> <span class="muted small">(${SIZE_RANGE[m.size]})</span>${m.photo ? '<br><span class="muted small">Measured from a photo: the live camera is more precise.</span>' : ''}`
+      ? (m.source === 'glasses'
+        ? `From your glasses <b>${m.lens}□${m.bridge}</b> · frame width about <b>${m.face} mm</b>${m.pd ? ` · PD <b>${m.pd} mm</b>` : ''}<br>Your size: <b>${SIZE_LABEL[m.size]}</b> <span class="muted small">(${SIZE_RANGE[m.size]}) · exact</span>`
+        : `Face width <b>${m.face} mm</b> · PD <b>${m.pd} mm</b><br>Your size: <b>${SIZE_LABEL[m.size]}</b> <span class="muted small">(${SIZE_RANGE[m.size]}) · camera estimate ±2 mm${m.photo ? ', from a photo' : ''}</span><br><span class="muted small">For an exact size, use the numbers from your current glasses below.</span>`)
       : 'Tap <b>Measure my size</b> (live camera, glasses off), or pick a size.';
     $('#sizeChips').innerHTML = ['', 'SMALL', 'MEDIUM', 'WIDE'].map((k) => `<button class="chip ${(S.sizeFilter || '') === k ? 'on' : ''}" data-size="${k}">${k ? SIZE_LABEL[k] + (m && m.size === k ? ' ✓' : '') : 'All sizes'}</button>`).join('');
   }
@@ -452,7 +480,7 @@
   $('#auto').addEventListener('change', () => { if ($('#auto').checked) { S.manual = null; place(); } });
 
   // ---------- Capture ----------
-  let lastShot = null;
+  let lastShot = null, lastRaw = null;
   async function capture() {
     const W = stage.clientWidth, H = stage.clientHeight, dpr = Math.min(window.devicePixelRatio || 1, 2);
     const c = document.createElement('canvas'); c.width = W * dpr; c.height = H * dpr;
@@ -470,10 +498,18 @@
     g.fillStyle = 'rgba(4,7,34,.6)'; g.fillRect(W - 150, H - 30, 142, 22);
     g.fillStyle = '#fff'; g.font = '600 12px Quicksand, sans-serif'; g.fillText(`Lensio · ${S.sel ? S.sel.name : ''}`.slice(0, 26), W - 144, H - 15);
     lastShot = c.toDataURL('image/jpeg', 0.92);
-    if (inRN) { post({ type: 'capture', dataUrl: lastShot, name: S.sel?.name }); toast('Photo ready to save or share'); return; }
+    // The plain photo (no frame drawn on it), for "Use this photo for size & frames"
+    lastRaw = null;
+    if (S.mode === 'live' && video.videoWidth) {
+      const r = document.createElement('canvas'); r.width = video.videoWidth; r.height = video.videoHeight;
+      const rg = r.getContext('2d'); rg.translate(r.width, 0); rg.scale(-1, 1); rg.drawImage(video, 0, 0);
+      lastRaw = r.toDataURL('image/jpeg', 0.95);
+    } else if (S.mode === 'photo') lastRaw = photo.src;
+    $('#useShotBtn').hidden = !lastRaw;
     $('#shotImg').src = lastShot; $('#shot').style.display = 'flex';
   }
   async function share() {
+    if (inRN) { post({ type: 'capture', dataUrl: lastShot, name: S.sel?.name }); return; }   // app opens its share sheet
     try {
       const blob = await (await fetch(lastShot)).blob();
       const file = new File([blob], 'lensio-try-on.jpg', { type: 'image/jpeg' });
@@ -481,7 +517,19 @@
       else save();
     } catch { /* user closed the share sheet */ }
   }
-  function save() { const a = document.createElement('a'); a.href = lastShot; a.download = 'lensio-try-on.jpg'; document.body.appendChild(a); a.click(); a.remove(); }
+  function save() {
+    if (inRN) { post({ type: 'save', dataUrl: lastShot, name: S.sel?.name }); return; }          // app saves to the gallery
+    const a = document.createElement('a'); a.href = lastShot; a.download = 'lensio-try-on.jpg'; document.body.appendChild(a); a.click(); a.remove();
+    toast('Photo downloaded. On iPhone: press and hold the photo → Save to Photos.');
+  }
+  /** Uses the captured photo like an uploaded selfie: fits frames to it and measures the size. */
+  async function useShot() {
+    if (!lastRaw) return;
+    $('#shot').style.display = 'none';
+    const blob = await (await fetch(lastRaw)).blob();
+    await useSelfie(new File([blob], 'lensio-photo.jpg', { type: 'image/jpeg' }));
+    if (S.mode === 'photo') measure();
+  }
 
   // ---------- Wiring ----------
   $('#camBtn').addEventListener('click', () => (S.stream ? stopCam() : startCam()));
@@ -497,6 +545,9 @@
   });
   $('#shareBtn').addEventListener('click', share);
   $('#saveBtn').addEventListener('click', save);
+  $('#useShotBtn').addEventListener('click', useShot);
+  $('#exactBtn').addEventListener('click', () => { $('#exactBox').hidden = !$('#exactBox').hidden; });
+  $('#exSave').addEventListener('click', exactFromGlasses);
   $('#closeShot').addEventListener('click', () => { $('#shot').style.display = 'none'; });
   $('#swatches').addEventListener('click', async (e) => {
     const b = e.target.closest('.sw'); if (!b || b.dataset.hex === S.color) return;

@@ -83,6 +83,14 @@
         {
           "locationWhenInUsePermission": "Lensio uses your location only to show the nearest Lensio store."
         }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Lensio saves your try-on photos to your gallery.",
+          "savePhotosPermission": "Lensio saves your try-on photos to your gallery.",
+          "isAccessMediaLocationEnabled": false
+        }
       ]
     ],
     "experiments": {

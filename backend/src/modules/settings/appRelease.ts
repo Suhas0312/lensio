@@ -16,11 +16,16 @@ export const isNewer = (a: string, b: string) => {
   return false;
 };
 
-/** "Suhas0312/lensio" from a setting, or from a GitHub release download link. */
-export function releaseRepo(explicit: string | null, apkUrl: string | null) {
+/** Where the automatic release robot (.github/workflows/android-release.yml) publishes the app. */
+export const DEFAULT_RELEASE_REPO = process.env.ANDROID_RELEASE_REPO || 'Suhas0312/lensio';
+
+/**
+ * The GitHub repo to read app releases from: the admin setting if filled in, otherwise the repo the
+ * release robot publishes to. No admin step is needed for automatic releases.
+ */
+export function releaseRepo(explicit: string | null, _apkUrl?: string | null) {
   if (explicit && /^[\w.-]+\/[\w.-]+$/.test(explicit)) return explicit;
-  const m = apkUrl?.match(/^https:\/\/github\.com\/([\w.-]+\/[\w.-]+)\/releases\//i);
-  return m ? m[1] : null;
+  return /^[\w.-]+\/[\w.-]+$/.test(DEFAULT_RELEASE_REPO) ? DEFAULT_RELEASE_REPO : null;
 }
 
 export function cleanNotes(body: string | null | undefined) {

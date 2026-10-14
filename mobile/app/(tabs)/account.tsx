@@ -16,6 +16,17 @@ import { colors, space } from '@/theme';
 export default function Account() {
   const { user, signOut, setUser } = useAuth();
   const [name, setName] = useState(user?.name ?? '');
+  const [savingName, setSavingName] = useState(false);
+  // The page can open before sign-in finishes: show the saved name as soon as the account loads.
+  useEffect(() => { setName(user?.name ?? ''); }, [user?.id, user?.name]);
+  const nameChanged = !!name.trim() && name.trim() !== (user?.name ?? '');
+  const saveName = async () => {
+    if (!nameChanged || !user) return;
+    setSavingName(true);
+    try { setUser(await api('/auth/me', { method: 'PATCH', body: { name: name.trim() } })); }
+    catch (e) { Alert.alert('Could not save your name', (e as Error).message); }
+    finally { setSavingName(false); }
+  };
   const [rx, setRx] = useState<Prescription[]>([]);
   const [support, setSupport] = useState('919999999999');
   const [pwOpen, setPwOpen] = useState(false);
@@ -45,8 +56,10 @@ export default function Account() {
       {user ? (
         <Card>
           <Text v="caption" color={colors.muted}>Signed in as {user.email ?? (user.phone ? `+91 ${user.phone}` : '')}</Text>
-          <Field label="Your name *" value={name} onChangeText={setName} placeholder="Name for orders" error={!name.trim() ? 'Enter your name' : undefined}
-            onBlur={async () => { if (name.trim() && name !== user.name) setUser(await api('/auth/me', { method: 'PATCH', body: { name: name.trim() } }).catch(() => user)); }} />
+          <Field label="Your name *" value={name} onChangeText={setName} placeholder="Name for orders" textContentType="name" autoComplete="name"
+            hint={!user.name ? 'Add your name once. It is used for your orders and deliveries.' : undefined}
+            onSubmitEditing={saveName} returnKeyType="done" />
+          {nameChanged ? <Button title="Save name" onPress={saveName} loading={savingName} /> : null}
         </Card>
       ) : null}
       {user ? (

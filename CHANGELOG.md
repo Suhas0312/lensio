@@ -5,6 +5,13 @@ Server versions are shown in `/v1/config` and the admin header. App versions are
 ## Server 2.0.11
 - **Automatic app releases:** Lensio reads the newest GitHub release (tag like v2.0.2, .apk attached, not a pre-release) of the repo in the APK link (or Admin → Settings → GitHub repo). Within 5 minutes the download page, `/download/lensio.apk` and the customers' update window switch to it, with the release notes as “What's new”. No admin step. Admin settings show “Automatic ✓ v2.0.1” or what to fix; manual fields remain as fallback. Optional `GITHUB_TOKEN` env raises GitHub's rate limit.
 
+## Server 2.0.12 · App 2.0.3 (automatic)
+- **Try-on capture:** after Capture: Save to gallery (Android app saves straight into Gallery/Photos, Lensio album), Share, and “Use this photo for size & frames” (fits frames to the photo and measures it).
+- **Photo from gallery:** the upload button no longer forces the camera, so phones offer Gallery/Photos.
+- **More accurate size:** iris measured horizontally only (eyelids made sizes too big), 40 readings with outliers removed, stricter head-straight checks, retry when the reading wobbles; shown as ±2 mm. **Exact option:** enter the numbers from your current glasses (e.g. 52□18) and optional PD.
+- **Account name:** the name now appears right after sign-in (the page read it before sign-in finished, so it looked empty and asked again); clear Save button.
+- **Releases need no admin step:** the server reads the release robot's repo (Suhas0312/lensio) by default.
+
 ## Automatic Android releases
 - `.github/workflows/android-release.yml`: every upload that changes `mobile/` picks the next version, builds the APK on Expo and publishes a GitHub release. The server already reads the newest release, so /download and the in-app update window follow automatically. One-time setup: docs/AUTO-RELEASE.md.
 

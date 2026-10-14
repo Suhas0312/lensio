@@ -79,13 +79,35 @@ function NativeTryOn({ src }: { src: string }) {
         onMessage={(e) => {
           try {
             const m = JSON.parse(e.nativeEvent.data);
-            if (m.type === 'capture' && m.dataUrl) saveCapture(m.dataUrl);
+            if (m.type === 'save' && m.dataUrl) saveToGallery(m.dataUrl);
+            else if (m.type === 'capture' && m.dataUrl) saveCapture(m.dataUrl);
             else onPageMessage(m);
           } catch { /* ignore */ }
         }}
       />
     </SafeAreaView>
   );
+}
+
+/** "Save to gallery": puts the try-on photo straight into the phone's Gallery / Photos (Lensio album). */
+async function saveToGallery(dataUrl: string) {
+  try {
+    const FileSystem = require('expo-file-system') as typeof import('expo-file-system');
+    const MediaLibrary = require('expo-media-library') as typeof import('expo-media-library');
+    const perm = await MediaLibrary.requestPermissionsAsync(true);
+    if (!perm.granted) { Alert.alert('Allow photos', 'To save your try-on photo, allow Lensio to add photos in your phone settings.'); return; }
+    const uri = `${FileSystem.cacheDirectory}lensio-try-on-${Date.now()}.jpg`;
+    await FileSystem.writeAsStringAsync(uri, dataUrl.split(',')[1], { encoding: FileSystem.EncodingType.Base64 });
+    const asset = await MediaLibrary.createAssetAsync(uri);
+    try {
+      const album = await MediaLibrary.getAlbumAsync('Lensio');
+      if (album) await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
+      else await MediaLibrary.createAlbumAsync('Lensio', asset, false);
+    } catch { /* saved to the gallery; the album is optional */ }
+    Alert.alert('Saved to your gallery', 'Find it in Gallery / Photos (Lensio album).');
+  } catch {
+    saveCapture(dataUrl);   // fall back to the share sheet
+  }
 }
 
 /** Saves the captured try-on photo and opens the share sheet (WhatsApp, Instagram, Gallery…). */

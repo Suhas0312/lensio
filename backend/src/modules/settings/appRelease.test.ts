@@ -12,10 +12,16 @@ beforeEach(() => {
 });
 
 describe('automatic Android release from GitHub', () => {
-  it('finds the repo from the APK link already in admin', () => {
-    expect(releaseRepo(null, settings.androidApkUrl)).toBe('Suhas0312/lensio');
+  it('reads the release robot repo by default, or the repo set in admin', () => {
+    expect(releaseRepo(null, 'https://github.com/Suhas0312/lensio-app/releases/latest/download/lensio.apk')).toBe('Suhas0312/lensio');
+    expect(releaseRepo(null, 'https://pub-x.r2.dev/a.apk')).toBe('Suhas0312/lensio');
     expect(releaseRepo('Suhas0312/lensio-app', settings.androidApkUrl)).toBe('Suhas0312/lensio-app');
-    expect(releaseRepo(null, 'https://pub-x.r2.dev/a.apk')).toBeNull();
+  });
+  it('switches from an old admin link to the newest automatic release with no admin step', async () => {
+    settings.androidApkUrl = 'https://github.com/Suhas0312/lensio-app/releases/latest/download/lensio.apk';
+    const r = await androidRelease();
+    expect(r).toMatchObject({ source: 'github', version: '2.0.1', repo: 'Suhas0312/lensio' });
+    settings.androidApkUrl = 'https://github.com/Suhas0312/lensio/releases/download/v1.0.5/lensio.apk';
   });
   it('uses the newest GitHub release instead of the old admin version', async () => {
     const r = await androidRelease();
