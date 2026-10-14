@@ -1,0 +1,99 @@
+{
+  "expo": {
+    "name": "Lensio",
+    "slug": "lensio",
+    "scheme": "lensio",
+    "version": "2.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#040722",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#040722"
+    },
+    "ios": {
+      "bundleIdentifier": "in.lensio.app",
+      "buildNumber": "1",
+      "supportsTablet": false,
+      "infoPlist": {
+        "NSCameraUsageDescription": "Lensio uses your camera to let you try on frames and to photograph your prescription.",
+        "NSPhotoLibraryUsageDescription": "Lensio needs access to your photos so you can upload a picture of your prescription.",
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSMicrophoneUsageDescription": "Lensio uses the microphone so you can search frames and chat with your voice.",
+        "NSSpeechRecognitionUsageDescription": "Lensio turns your voice into text to search frames and answer your questions.",
+        "NSLocationWhenInUseUsageDescription": "Lensio uses your location only to show the nearest Lensio store."
+      }
+    },
+    "android": {
+      "package": "in.lensio.app",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#040722"
+      },
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.REQUEST_INSTALL_PACKAGES"
+      ],
+      "blockedPermissions": []
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/favicon.png",
+      "name": "Lensio",
+      "shortName": "Lensio",
+      "themeColor": "#040722",
+      "backgroundColor": "#040722",
+      "description": "Frames with lenses, made to your prescription."
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      "expo-secure-store",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Lensio uses your camera to let you try on frames and to photograph your prescription."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Lensio needs access to your photos so you can upload a picture of your prescription."
+        }
+      ],
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Lensio uses the microphone so you can search frames and chat with your voice.",
+          "speechRecognitionPermission": "Lensio turns your voice into text to search frames and answer your questions.",
+          "androidSpeechServicePackages": [
+            "com.google.android.googlequicksearchbox",
+            "com.google.android.tts"
+          ]
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Lensio uses your location only to show the nearest Lensio store."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": false
+    },
+    "extra": {
+      "apiUrl": "https://lensio-api.onrender.com/v1",
+      "eas": {
+        "projectId": "8c1f80e9-4356-4782-941c-2387431ce7a8"
+      }
+    },
+    "owner": "suhasm2k03"
+  }
+}
