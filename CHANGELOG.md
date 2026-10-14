@@ -2,7 +2,10 @@
 
 Server versions are shown in `/v1/config` and the admin header. App versions are in `mobile/app.json`.
 
-## Server 2.0.9 · App 2.0.0
+## Server 2.0.10
+- **Web app now opens in Safari (iPhone, iPad, Mac):** the voice-search library crashed on load because Safari lacks `webkitSpeechGrammarList`; the startup script now provides it. Reproduced and verified.
+
+## Server 2.0.9 · App 2.0.1
 - **Payment safety:** an order waiting for payment can no longer be started by any button, staff account or old app until the payment is confirmed (UPI checked by the shop, or online payment captured). Tested.
 - **Cash on delivery** needs a verified mobile number once WhatsApp/SMS codes are switched on, so fake COD orders with made-up numbers are blocked; checkout offers “Verify now” or UPI.
 - **Web app on every device:** compatibility for older iPhones (before iOS 15.4) and older browsers; if the web app still can't start on a device, it shows a helpful message with error details instead of a blank page. Tested as Windows, Mac, iPhone and Android.

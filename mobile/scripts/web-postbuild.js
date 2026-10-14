@@ -25,6 +25,27 @@ const boot = `(function () {
   if (typeof self.structuredClone !== 'function') self.structuredClone = function (v) { return v === undefined ? v : JSON.parse(JSON.stringify(v)); };
   if (!Array.prototype.at) Object.defineProperty(Array.prototype, 'at', { configurable: true, writable: true, value: function (i) { i = Math.trunc(i) || 0; if (i < 0) i += this.length; return this[i]; } });
   if (!Object.hasOwn) Object.hasOwn = function (o, k) { return Object.prototype.hasOwnProperty.call(o, k); };
+  // Safari (iPhone, Mac) has webkitSpeechRecognition but not webkitSpeechGrammarList / webkitSpeechRecognitionEvent;
+  // the voice-search library reads all three when it loads, which crashed the whole app. Provide harmless stand-ins.
+  if (typeof self.webkitSpeechRecognition !== 'undefined' || typeof self.SpeechRecognition !== 'undefined') {
+    var GL = function () { this.length = 0; }; GL.prototype.addFromString = function () {}; GL.prototype.addFromURI = function () {}; GL.prototype.item = function () { return null; };
+    if (typeof self.webkitSpeechGrammarList === 'undefined') self.webkitSpeechGrammarList = self.SpeechGrammarList || GL;
+    if (typeof self.SpeechGrammarList === 'undefined') self.SpeechGrammarList = self.webkitSpeechGrammarList;
+    if (typeof self.webkitSpeechRecognitionEvent === 'undefined') self.webkitSpeechRecognitionEvent = self.SpeechRecognitionEvent || Event;
+    if (typeof self.SpeechRecognitionEvent === 'undefined') self.SpeechRecognitionEvent = self.webkitSpeechRecognitionEvent;
+  }
+  // Safari has webkitSpeechRecognition but not the grammar/event classes the voice-search library expects.
+  // Without these stand-ins the whole app crashed on iPhone and Mac ("Can't find variable: webkitSpeechGrammarList").
+  function Grammars() { this.length = 0; this.addFromString = function () {}; this.addFromURI = function () {}; this.item = function () { return null; }; }
+  function SpeechEvent() {}
+  if (typeof self.webkitSpeechRecognition !== 'undefined') {
+    if (typeof self.webkitSpeechGrammarList === 'undefined') self.webkitSpeechGrammarList = Grammars;
+    if (typeof self.webkitSpeechRecognitionEvent === 'undefined') self.webkitSpeechRecognitionEvent = SpeechEvent;
+  }
+  if (typeof self.SpeechRecognition !== 'undefined') {
+    if (typeof self.SpeechGrammarList === 'undefined') self.SpeechGrammarList = Grammars;
+    if (typeof self.SpeechRecognitionEvent === 'undefined') self.SpeechRecognitionEvent = SpeechEvent;
+  }
   var errors = [];
   addEventListener('error', function (e) { errors.push(String(e.message || e.error || e)); });
   addEventListener('unhandledrejection', function (e) { errors.push(String(e.reason && e.reason.message || e.reason)); });
@@ -41,7 +62,7 @@ const boot = `(function () {
 fs.writeFileSync(path.join(dist, 'boot.js'), boot);
 
 let html = fs.readFileSync(path.join(dist, 'index.html'), 'utf8');
-html = html.replace(/<meta name="viewport"[^>]*\/>/, '').replace('</title>', '</title>' + head + '\n    <script src="/boot.js"></script>');
+html = html.replace(/<meta name="viewport"[^>]*\/>/, '').replace('</title>', '</title>' + head + '\n    <script src="/boot.js?v=' + Date.now() + '"></script>');
 fs.writeFileSync(path.join(dist, 'index.html'), html);
 
 fs.mkdirSync(path.join(dist, 'icons'), { recursive: true });
