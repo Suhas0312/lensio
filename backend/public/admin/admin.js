@@ -344,6 +344,13 @@
   }
   const waTo = (phone, text) => `https://wa.me/91${phone}?text=${encodeURIComponent(text)}`;
 
+  function releaseStatus(r) {
+    if (!r) return '';
+    if (r.source === 'github') return `<p><span class="pill ok">Automatic ✓</span> Customers get <b>v${esc(r.version)}</b> from GitHub (${esc(r.repo)}). <a href="/download" target="_blank" rel="noopener">Open download page</a></p>`;
+    if (r.repo && r.error) return `<p><span class="pill warn">Check GitHub</span> Couldn't read the latest release of <b>${esc(r.repo)}</b>: ${esc(r.error)}. Using the fallback below${r.version ? ` (v${esc(r.version)})` : ''}.</p>`;
+    return `<p><span class="pill">Manual</span> Customers get ${r.version ? `<b>v${esc(r.version)}</b>` : 'no version yet'} from the fields below. Add your GitHub repo to make it automatic.</p>`;
+  }
+
   function deliveryCard(o) {
     const a = o.address, cod = o.paymentMethod === 'COD' && !o.payments.some((p) => p.status === 'COD_COLLECTED');
     const ph = (n, label) => `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:4px 0"><b>${label}</b> <a href="tel:+91${esc(n)}">+91 ${esc(n)}</a>
@@ -568,6 +575,9 @@
         <p class="muted small">The in-app assistant uses this to answer questions about your shop. Write it like you'd tell a new staff member: returns and exchanges, warranty, store address and hours, delivery areas, anything customers often ask.</p>
         <textarea id="setInfo" rows="6" placeholder="e.g. Returns: 7 days for unused frames. Lenses made to prescription can't be returned. Store: HSR Layout, Bengaluru, open 10am–8pm. We deliver across India.">${esc(s.shopInfo || '')}</textarea></div>
       <div class="card"><h2>Android app download</h2>
+        ${releaseStatus(S.data.release)}
+        <label>GitHub repo with your app releases (automatic updates)<input id="setRepo" placeholder="Suhas0312/lensio" value="${esc(s.androidReleaseRepo || '')}" style="max-width:280px"></label>
+        <p class="muted small">Publish a GitHub release (tag like <b>v2.0.2</b>, with the <b>.apk</b> attached, not a pre-release) and within 5 minutes the download page, the permanent link and the customers' update window switch to it. Nothing else to change here. Leave empty to use the GitHub repo from the link below. The fields below are only a fallback.</p>
         <p class="muted small">Customers install the app from <a href="/download" target="_blank" rel="noopener">your download page</a>. Upload the APK to Cloudflare R2, then paste its public link here. When you release a new version, update both fields and the app tells customers to update.</p>
         <label>APK download link<input id="setApk" placeholder="https://pub-….r2.dev/lensio-1.0.0.apk" value="${esc(s.androidApkUrl || '')}"></label>
         <label>Latest version<input id="setVer" placeholder="1.0.0" value="${esc(s.androidLatestVersion || '')}" style="max-width:160px"></label>
@@ -632,7 +642,7 @@
         S.data.orders = await api('/admin/orders?' + q);
       }
       if (view === 'rx') S.data.rx = await api('/admin/prescriptions/queue');
-      if (view === 'settings') S.data.settings = await api('/admin/settings');
+      if (view === 'settings') { S.data.settings = await api('/admin/settings'); S.data.release = await api('/admin/app-release').catch(() => null); }
       if (view === 'reviews') { S.data.settings = S.data.settings || await api('/admin/settings'); S.data.reviews = await api('/admin/reviews?status=' + (S.data.reviewFilter || 'PENDING')); }
       if (view === 'rewards') { S.data.settings = S.data.settings || await api('/admin/settings'); S.data.giftcards = await api('/admin/giftcards'); }
       if (view === 'stores') S.data.stores = await api('/admin/stores');
@@ -800,13 +810,13 @@
         try {
           S.data.settings = await api('/admin/settings', { method: 'PUT', body: {
             upiId: $('#setUpi').value.trim() || null, upiPayeeName: $('#setPayee').value.trim() || 'Lensio', codEnabled: $('#setCod').checked,
-            androidApkUrl: $('#setApk').value.trim() || null, androidLatestVersion: $('#setVer').value.trim() || null, androidMinVersion: $('#setMinVer').value.trim() || null, androidUpdateNotes: $('#setNotes').value.trim() || null, shopInfo: $('#setInfo').value.trim() || null,
+            androidApkUrl: $('#setApk').value.trim() || null, androidLatestVersion: $('#setVer').value.trim() || null, androidMinVersion: $('#setMinVer').value.trim() || null, androidReleaseRepo: $('#setRepo').value.trim().replace(/^https?:\/\/github\.com\//i, '').replace(/\/+$/, '') || null, androidUpdateNotes: $('#setNotes').value.trim() || null, shopInfo: $('#setInfo').value.trim() || null,
             instagramUrl: ($('#setInsta').value.trim().split('?')[0]) || null,
             ownerEmailAlerts: $('#setAlerts').checked, autoStartLensWork: $('#setAutoLens').checked,
             frameOnlyToQc: $('#setFrameQc').checked, autoApproveTypedRx: $('#setAutoRx').checked,
             loyaltyEnabled: $('#setLoyal').checked, loyaltyPointsPer100: Math.max(0, parseInt($('#setPts').value, 10) || 0),
             loyaltyMaxRedeemPercent: Math.min(100, Math.max(0, parseInt($('#setPtsMax').value, 10) || 0)), reviewsAutoApprove: $('#setRevAuto').checked } });
-          toast('Settings saved'); return render();
+          S.data.release = await api('/admin/app-release').catch(() => null); toast('Settings saved'); return render();
         } catch (x) { $('#serr').textContent = x.message; return; }
       }
       if (act === 'igOpen') return igLoad();
