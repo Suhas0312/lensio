@@ -5,10 +5,21 @@ vi.mock('../../lib/logger', () => ({ logger: { warn: () => {} } }));
 const { androidRelease, cleanNotes, releaseRepo, _resetReleaseCache } = await import('./appRelease');
 
 let gh: any; let calls = 0;
+// Simulates github.com's public pages: /releases/latest redirect, the APK download, the releases feed.
 beforeEach(() => {
   _resetReleaseCache(); calls = 0;
-  gh = { status: 200, json: { tag_name: 'v2.0.1', body: '## What\'s Changed\n- **Size** measurement\n\n**Full Changelog**: https://github.com/x/y/commits/v2.0.1', assets: [{ name: 'lensio.apk', browser_download_url: 'https://github.com/Suhas0312/lensio/releases/download/v2.0.1/lensio.apk' }] } };
-  vi.stubGlobal('fetch', async (url: string) => { calls++; expect(url).toBe('https://api.github.com/repos/Suhas0312/lensio/releases/latest'); return { status: gh.status, ok: gh.status === 200, json: async () => gh.json }; });
+  gh = { tag: 'v2.0.1', apk: true, notes: '&lt;h2&gt;What&#39;s Changed&lt;/h2&gt;&lt;ul&gt;&lt;li&gt;&lt;strong&gt;Size&lt;/strong&gt; measurement&lt;/li&gt;&lt;/ul&gt;' };
+  vi.stubGlobal('fetch', async (url: string) => {
+    const res = (status: number, body = '', location = '') => ({ status, ok: status < 300, headers: { get: (h: string) => (h === 'location' ? location : null) }, text: async () => body });
+    if (url === 'https://github.com/Suhas0312/lensio/releases/latest') {
+      calls++;
+      return gh.tag ? res(302, '', `https://github.com/Suhas0312/lensio/releases/tag/${gh.tag}`) : res(302, '', 'https://github.com/Suhas0312/lensio/releases');
+    }
+    if (url.endsWith('/lensio.apk')) return res(gh.apk ? 302 : 404);
+    if (url.includes('/expanded_assets/')) return res(200, '<a href="/x/y/source.zip">src</a>');
+    if (url.endsWith('/releases.atom')) return res(200, `<feed><entry><id>tag:github.com,2008:Repository/1/${gh.tag}</id><content type="html">${gh.notes}</content></entry></feed>`);
+    throw new Error('unexpected ' + url);
+  });
 });
 
 describe('automatic Android release from GitHub', () => {
@@ -25,20 +36,23 @@ describe('automatic Android release from GitHub', () => {
   });
   it('uses the newest GitHub release instead of the old admin version', async () => {
     const r = await androidRelease();
-    expect(r).toMatchObject({ source: 'github', version: '2.0.1', apkUrl: gh.json.assets[0].browser_download_url, notes: '• Size measurement' });
+    expect(r).toMatchObject({ source: 'github', version: '2.0.1', apkUrl: 'https://github.com/Suhas0312/lensio/releases/download/v2.0.1/lensio.apk', notes: '• Size measurement' });
   });
-  it('checks GitHub at most every 5 minutes', async () => {
+  it('does not use the rate-limited GitHub API', async () => {
+    await androidRelease();   // the fetch stub throws on any api.github.com address
+  });
+  it('checks GitHub at most every few minutes', async () => {
     await androidRelease(); await androidRelease(); await androidRelease();
     expect(calls).toBe(1);
   });
   it('falls back to admin values when the release has no APK', async () => {
-    gh.json.assets = [];
+    gh.apk = false;
     const r = await androidRelease();
     expect(r).toMatchObject({ source: 'admin', version: '1.0.5' });
     expect(r.error).toMatch(/no \.apk/);
   });
-  it('ignores pre-releases (GitHub 404 for latest)', async () => {
-    gh.status = 404;
+  it('ignores pre-releases (no latest release)', async () => {
+    gh.tag = null;
     expect((await androidRelease()).source).toBe('admin');
   });
   it('cleans release notes', () => { expect(cleanNotes('**Full Changelog**: x')).toBeNull(); });

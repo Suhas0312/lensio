@@ -5,6 +5,9 @@ Server versions are shown in `/v1/config` and the admin header. App versions are
 ## Server 2.0.11
 - **Automatic app releases:** Lensio reads the newest GitHub release (tag like v2.0.2, .apk attached, not a pre-release) of the repo in the APK link (or Admin → Settings → GitHub repo). Within 5 minutes the download page, `/download/lensio.apk` and the customers' update window switch to it, with the release notes as “What's new”. No admin step. Admin settings show “Automatic ✓ v2.0.1” or what to fix; manual fields remain as fallback. Optional `GITHUB_TOKEN` env raises GitHub's rate limit.
 
+## Server 2.0.13
+- **Download page and in-app updates now always follow the newest release.** The server asked GitHub's API, which allows only 60 requests an hour per address; Render's shared addresses used that up, so the page fell back to the admin version (2.0.2 while 2.0.3 was out). Releases are now read from GitHub's public pages (no limit), checked every 3 minutes. Verified live: v2.0.3.
+
 ## Server 2.0.12 · App 2.0.3 (automatic)
 - **Try-on capture:** after Capture: Save to gallery (Android app saves straight into Gallery/Photos, Lensio album), Share, and “Use this photo for size & frames” (fits frames to the photo and measures it).
 - **Photo from gallery:** the upload button no longer forces the camera, so phones offer Gallery/Photos.
