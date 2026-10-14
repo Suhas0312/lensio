@@ -1,1 +1,0 @@
-MediaPipe Face Mesh 0.4.1633559619 — Apache License 2.0 (c) Google LLC. https://github.com/google/mediapipe
