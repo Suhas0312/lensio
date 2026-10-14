@@ -2,6 +2,16 @@
 
 Server versions are shown in `/v1/config` and the admin header. App versions are in `mobile/app.json`.
 
+## Server 2.0.11
+- **Automatic app releases:** Lensio reads the newest GitHub release (tag like v2.0.2, .apk attached, not a pre-release) of the repo in the APK link (or Admin → Settings → GitHub repo). Within 5 minutes the download page, `/download/lensio.apk` and the customers' update window switch to it, with the release notes as “What's new”. No admin step. Admin settings show “Automatic ✓ v2.0.1” or what to fix; manual fields remain as fallback. Optional `GITHUB_TOKEN` env raises GitHub's rate limit.
+
+## Automatic Android releases
+- `.github/workflows/android-release.yml`: every upload that changes `mobile/` picks the next version, builds the APK on Expo and publishes a GitHub release. The server already reads the newest release, so /download and the in-app update window follow automatically. One-time setup: docs/AUTO-RELEASE.md.
+
+## Server 2.0.11 · App 2.0.2
+- **“That code is incorrect” fixed:** when two codes were sent (resend or double tap), only the newest worked, so customers typing the first email's code were rejected. Any unused code from the last 10 minutes now works; guessing is still limited to 5 tries. Applies to email and WhatsApp/SMS codes. Tested.
+- **New people are sent to Create account:** signing in (password or email code) with an email that has no account now says so and switches to Create account with the email filled in, so every account has a name and mobile number. Accounts are no longer created silently without a name.
+
 ## Server 2.0.10
 - **Web app now opens in Safari (iPhone, iPad, Mac):** the voice-search library crashed on load because Safari lacks `webkitSpeechGrammarList`; the startup script now provides it. Reproduced and verified.
 

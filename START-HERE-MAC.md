@@ -52,7 +52,12 @@ uptimerobot.com → Add New Monitor → HTTP(s) → URL `https://lensio-api.onre
 See `docs/WHATSAPP-SETUP.md`. In Render → Environment add `WHATSAPP_TOKEN`,
 `WHATSAPP_PHONE_NUMBER_ID`, `OWNER_WHATSAPP_NUMBERS`, `SUPPORT_WHATSAPP_NUMBER`, then Save.
 
-## Every later app version
+## Every later app version (automatic)
+
+After the one-time setup in `docs/AUTO-RELEASE.md`, just upload your changes to `mobile/`:
+GitHub builds and publishes the app, and customers are asked to update. Nothing else to do.
+
+## Every later app version (by hand, if automation is off)
 
 Change `"version"` in `mobile/app.json` (e.g. `2.0.1`) → `bash build-android.sh` → new GitHub
 release → update Latest version in admin.

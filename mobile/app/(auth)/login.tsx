@@ -60,14 +60,22 @@ export default function Login() {
   };
   const run = async (fn: () => Promise<void>) => {
     setBusy(true); setErr(undefined);
-    try { await fn(); } catch (e) { setErr((e as ApiError).message); } finally { setBusy(false); }
+    try { await fn(); } catch (e) {
+      const ae = e as ApiError;
+      // New here: take them to Create account with their email filled in (name + mobile are needed for delivery).
+      if (ae.code === 'NO_ACCOUNT') { switchMode('signup'); setErr('No Lensio account with this email yet. Add your name and mobile number to create one.'); }
+      else setErr(ae.message);
+    } finally { setBusy(false); }
   };
   const emailOk = /\S+@\S+\.\S+/.test(email.trim());
   const phoneOk = phone.replace(/\D/g, '').length === 10;
 
   const signin = () => run(async () => done(await api('/auth/login', { body: { email, password } })));
   const signup = () => run(async () => done(await api('/auth/register', { body: { name, email, password, phone } })));
-  const sendCode = () => run(async () => { await api('/auth/email-code/send', { body: { email } }); setCodeSent(true); setCooldown(30); });
+  const sendCode = () => run(async () => {
+    await api('/auth/email-code/send', { body: { email, purpose: mode === 'signup' ? 'signup' : 'signin' } });
+    setCodeSent(true); setCooldown(30); setCode('');
+  });
   const verifyCode = () => run(async () => done(await api('/auth/email-code/verify', {
     body: { email, code, ...(newPassword ? { newPassword } : {}) },
   })));

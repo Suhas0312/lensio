@@ -3,7 +3,7 @@
     "name": "Lensio",
     "slug": "lensio",
     "scheme": "lensio",
-    "version": "2.0.1",
+    "version": "2.0.2",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "backgroundColor": "#040722",
