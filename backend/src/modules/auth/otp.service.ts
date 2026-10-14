@@ -49,23 +49,32 @@ export async function sendOtp(phone: string, prefer: OtpChannel = 'whatsapp'): P
   throw new AppError(502, 'OTP_SEND_FAILED', 'Could not send the code. Check the number and try again, or sign in with email.');
 }
 
+/**
+ * Checks a code against every unused, unexpired code for this phone/email (newest first).
+ * Customers often receive two codes (a resend or double tap) and type the first one; that must still work.
+ * Wrong attempts are counted across all of them, so guessing is still limited to MAX_ATTEMPTS.
+ */
+async function checkCode(where: { phone: string } | { email: string }, key: string, code: string) {
+  const live = await prisma.otpCode.findMany({ where: { ...where, consumed: false, expiresAt: { gt: new Date() } }, orderBy: { createdAt: 'desc' }, take: 5 });
+  if (!live.length) throw badRequest('OTP_EXPIRED', 'This code has expired. Request a new one.');
+  const wrong = live.reduce((n, o) => n + o.attempts, 0);
+  if (wrong >= MAX_ATTEMPTS) throw badRequest('OTP_LOCKED', 'Too many wrong attempts. Request a new code.');
+  const b = Buffer.from(hash(key, code));
+  const hit = live.find((o) => { const a = Buffer.from(o.codeHash); return a.length === b.length && crypto.timingSafeEqual(a, b); });
+  if (!hit) {
+    await prisma.otpCode.update({ where: { id: live[0].id }, data: { attempts: { increment: 1 } } });
+    throw badRequest('OTP_INVALID', 'That code is incorrect. Use the code from the newest message, or tap Resend.');
+  }
+  // Signed in: retire every outstanding code for this phone/email.
+  await prisma.otpCode.updateMany({ where: { ...where, consumed: false }, data: { consumed: true } });
+}
+
 export async function verifyOtp(phone: string, code: string) {
   if (env.REVIEW_PHONE && env.REVIEW_OTP && phone === env.REVIEW_PHONE) {
     if (code === env.REVIEW_OTP) return;
     throw badRequest('OTP_INVALID', 'That code is incorrect.');
   }
-  const otp = await prisma.otpCode.findFirst({
-    where: { phone, consumed: false, expiresAt: { gt: new Date() } }, orderBy: { createdAt: 'desc' },
-  });
-  if (!otp) throw badRequest('OTP_EXPIRED', 'This code has expired. Request a new one.');
-  if (otp.attempts >= MAX_ATTEMPTS) throw badRequest('OTP_LOCKED', 'Too many wrong attempts. Request a new code.');
-
-  const a = Buffer.from(otp.codeHash), b = Buffer.from(hash(phone, code));
-  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
-    await prisma.otpCode.update({ where: { id: otp.id }, data: { attempts: { increment: 1 } } });
-    throw badRequest('OTP_INVALID', 'That code is incorrect.');
-  }
-  await prisma.otpCode.update({ where: { id: otp.id }, data: { consumed: true } });
+  await checkCode({ phone }, phone, code);
 }
 
 // ---------------- Email codes (free, via Brevo) ----------------
@@ -91,13 +100,5 @@ export async function verifyEmailCode(email: string, code: string) {
     if (code === env.REVIEW_OTP) return;
     throw badRequest('OTP_INVALID', 'That code is incorrect.');
   }
-  const otp = await prisma.otpCode.findFirst({ where: { email, consumed: false, expiresAt: { gt: new Date() } }, orderBy: { createdAt: 'desc' } });
-  if (!otp) throw badRequest('OTP_EXPIRED', 'This code has expired. Request a new one.');
-  if (otp.attempts >= MAX_ATTEMPTS) throw badRequest('OTP_LOCKED', 'Too many wrong attempts. Request a new code.');
-  const a = Buffer.from(otp.codeHash), b = Buffer.from(hash(email, code));
-  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
-    await prisma.otpCode.update({ where: { id: otp.id }, data: { attempts: { increment: 1 } } });
-    throw badRequest('OTP_INVALID', 'That code is incorrect.');
-  }
-  await prisma.otpCode.update({ where: { id: otp.id }, data: { consumed: true } });
+  await checkCode({ email }, email, code);
 }

@@ -11,6 +11,7 @@ export interface ShopSettings {
   androidLatestVersion: string | null; // e.g. 1.0.1; the app shows "Update available" when it's older
   androidMinVersion: string | null;    // apps older than this must update before they can be used
   androidUpdateNotes: string | null;   // "What's new", shown in the app's update window
+  androidReleaseRepo: string | null;   // GitHub repo with the APK releases (e.g. Suhas0312/lensio); read automatically
   shopInfo: string | null;             // free text for the AI assistant: returns, hours, address, delivery areas
   instagramUrl: string | null;         // shown in the app, download page and assistant
   // Automation
@@ -26,7 +27,7 @@ export interface ShopSettings {
   reviewsAutoApprove: boolean;         // customer reviews go live immediately instead of waiting for moderation
 }
 
-const DEFAULTS: ShopSettings = { upiId: null, upiPayeeName: 'Lensio', upiQrImage: null, codEnabled: true, androidApkUrl: null, androidLatestVersion: null, androidMinVersion: null, androidUpdateNotes: null, shopInfo: null, instagramUrl: null,
+const DEFAULTS: ShopSettings = { upiId: null, upiPayeeName: 'Lensio', upiQrImage: null, codEnabled: true, androidApkUrl: null, androidLatestVersion: null, androidMinVersion: null, androidUpdateNotes: null, androidReleaseRepo: null, shopInfo: null, instagramUrl: null,
   ownerEmailAlerts: true, autoStartLensWork: true, autoApproveTypedRx: false, frameOnlyToQc: true,
   loyaltyEnabled: true, loyaltyPointsPer100: 5, loyaltyMaxRedeemPercent: 20, reviewsAutoApprove: true };
 
@@ -46,6 +47,7 @@ export async function getSettings(): Promise<ShopSettings> {
     androidLatestVersion: m.androidLatestVersion || null,
     androidMinVersion: m.androidMinVersion || null,
     androidUpdateNotes: m.androidUpdateNotes || null,
+    androidReleaseRepo: m.androidReleaseRepo || null,
     shopInfo: m.shopInfo || null,
     instagramUrl: m.instagramUrl || null,
     ownerEmailAlerts: bool(m.ownerEmailAlerts, DEFAULTS.ownerEmailAlerts),

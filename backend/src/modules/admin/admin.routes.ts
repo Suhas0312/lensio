@@ -11,6 +11,7 @@ import { validate } from '../../middleware/validate';
 import { validatePrescription } from '../prescriptions/rx.rules';
 import { orderInclude, transition } from '../orders/orders.service';
 import { STATUS_LABEL } from '../notifications/whatsapp.service';
+import { androidRelease } from '../settings/appRelease';
 import { getSettings, saveSettings } from '../settings/settings.service';
 import { sendMail } from '../../lib/mail';
 import { notifyEyeTest, notifyOrderUpdate } from '../notifications/whatsapp.service';
@@ -362,6 +363,9 @@ r.post('/coupons', adminOnly, validate(z.object({
 
 // ---------- Shop settings ----------
 r.get('/settings', ah(async (_req, res) => { res.json(await getSettings()); }));
+/** What customers get right now: the automatic GitHub release (or the admin fallback), for the settings page. */
+r.get('/app-release', adminOnly, ah(async (_req, res) => { res.json(await androidRelease()); }));
+
 r.put('/settings', adminOnly, validate(z.object({
   upiId: z.string().trim().regex(/^[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z][a-zA-Z0-9]{1,64}$/, 'A UPI ID looks like name@okaxis').nullable().optional().or(z.literal('').transform(() => null)),
   upiPayeeName: z.string().trim().min(2).max(50).optional(),
@@ -375,6 +379,7 @@ r.put('/settings', adminOnly, validate(z.object({
   androidLatestVersion: z.string().trim().regex(/^\d+\.\d+\.\d+$/, 'Version looks like 1.0.1').nullable().optional().or(z.literal('').transform(() => null)),
   androidMinVersion: z.string().trim().regex(/^\d+\.\d+\.\d+$/, 'Minimum version looks like 1.0.1').nullable().optional().or(z.literal('').transform(() => null)),
   androidUpdateNotes: z.string().trim().max(600).nullable().optional().or(z.literal('').transform(() => null)),
+  androidReleaseRepo: z.string().trim().regex(/^[\w.-]+\/[\w.-]+$/, 'Type it like Suhas0312/lensio').nullable().optional().or(z.literal('').transform(() => null)),
   loyaltyEnabled: z.boolean().optional(), loyaltyPointsPer100: z.number().int().min(0).max(1000).optional(),
   loyaltyMaxRedeemPercent: z.number().int().min(0).max(100).optional(), reviewsAutoApprove: z.boolean().optional(),
 })), ah(async (req, res) => { res.json(await saveSettings(req.body)); }));

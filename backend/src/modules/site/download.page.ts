@@ -3,6 +3,7 @@ import QRCode from 'qrcode';
 import { env } from '../../config/env';
 import { ah } from '../../lib/asyncHandler';
 import { getSettings } from '../settings/settings.service';
+import { androidRelease } from '../settings/appRelease';
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
 
@@ -14,17 +15,17 @@ export const siteRoutes = Router();
  * admin → Settings → Android app download, so the same link works for every release.
  */
 siteRoutes.get(['/download/lensio.apk', '/download/latest', '/download/android'], ah(async (_req, res) => {
-  const s = await getSettings();
+  const rel = await androidRelease();
   res.set('Cache-Control', 'no-store');
-  if (!s.androidApkUrl) return res.redirect(302, '/download');
-  res.redirect(302, s.androidApkUrl);
+  if (!rel.apkUrl) return res.redirect(302, '/download');
+  res.redirect(302, rel.apkUrl);
 }));
 
 siteRoutes.get('/download', ah(async (req, res) => {
-  const s = await getSettings();
+  const [s, rel] = await Promise.all([getSettings(), androidRelease()]);
   const pageUrl = `${env.PUBLIC_BASE_URL.replace(/\/$/, '')}/download`;
   const qr = await QRCode.toDataURL(pageUrl, { margin: 1, width: 360 });
-  const apk = s.androidApkUrl;
+  const apk = rel.apkUrl;
   const wa = `https://wa.me/${env.SUPPORT_WHATSAPP_NUMBER}?text=${encodeURIComponent('Hi Lensio, I have a question')}`;
   res.set('Cache-Control', 'no-cache').type('html').send(`<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
@@ -59,9 +60,9 @@ a.link{color:#5ED3F3;font-weight:700}
 <div class="brand"><img src="/admin/mark.png" alt="" style="height:64px"><br><img src="/admin/wordmark.png" alt="Lensio"></div>
 <div><h1>Frames with lenses, made to your prescription</h1><p style="margin-top:10px">Browse frames, try them on with your camera, add your prescription and pay by UPI.</p></div>
 ${apk
-  ? `<a class="btn" href="/download/lensio.apk">⬇ Download for Android${s.androidLatestVersion ? ` · v${esc(s.androidLatestVersion)}` : ''}</a>
+  ? `<a class="btn" href="/download/lensio.apk">⬇ Download for Android${rel.version ? ` · v${esc(rel.version)}` : ''}</a>
      <p class="small" style="margin-top:-14px">Already have Lensio? Download and install: it updates the app you have. Your account and orders stay.</p>
-     ${s.androidUpdateNotes ? `<div class="card"><h2>What's new${s.androidLatestVersion ? ` in ${esc(s.androidLatestVersion)}` : ''}</h2><p>${esc(s.androidUpdateNotes)}</p></div>` : ''}`
+     ${rel.notes ? `<div class="card"><h2>What's new${rel.version ? ` in ${esc(rel.version)}` : ''}</h2><p style="white-space:pre-line">${esc(rel.notes)}</p></div>` : ''}`
   : `<span class="btn off">The Android app is coming soon</span>`}
 <div class="qrwrap desktop-only"><img class="qr" src="${qr}" alt="QR code to open this page on your phone"><span class="small" style="color:var(--muted)">On a computer? Scan with your Android phone.</span></div>
 <div class="card"><h2>How to install</h2><ol>

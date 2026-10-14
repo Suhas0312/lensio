@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 const settings = { androidApkUrl: null as string | null, androidLatestVersion: null as string | null, androidUpdateNotes: null as string | null, instagramUrl: null };
 vi.mock('../settings/settings.service', () => ({ getSettings: async () => settings }));
+vi.mock('../settings/appRelease', () => ({ androidRelease: async () => ({ apkUrl: settings.androidApkUrl, version: settings.androidLatestVersion, notes: settings.androidUpdateNotes, minVersion: null, source: 'admin', repo: null }) }));
 vi.mock('../../config/env', () => ({ env: { PUBLIC_BASE_URL: 'https://lensio-api.onrender.com', SUPPORT_WHATSAPP_NUMBER: '918086906713' } }));
 const { siteRoutes } = await import('./download.page');
 

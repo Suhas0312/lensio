@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
 import { swapPlaceholderImages } from './lib/frameArt';
+import { androidRelease } from './modules/settings/appRelease';
 import { whatsappEnabled } from './modules/notifications/whatsapp.service';
 import { smsEnabled } from './modules/auth/otp.service';
 import pinoHttp from 'pino-http';
@@ -74,18 +75,18 @@ export function createApp() {
 
   app.get('/v1/config', async (_req, res, next) => {
     try {
-      const s = await getSettings();
+      const [s, rel] = await Promise.all([getSettings(), androidRelease()]);
       res.json({
         supportWhatsApp: env.SUPPORT_WHATSAPP_NUMBER,
         razorpayKeyId: env.RAZORPAY_KEY_ID ?? null,
         payments: { razorpay: !!(env.RAZORPAY_KEY_ID && env.RAZORPAY_KEY_SECRET), upiManual: upiManualAvailable(s), cod: s.codEnabled },
-        app: { androidApkUrl: s.androidApkUrl, latestVersion: s.androidLatestVersion, minVersion: s.androidMinVersion, notes: s.androidUpdateNotes },
+        app: { androidApkUrl: rel.apkUrl, latestVersion: rel.version, minVersion: rel.minVersion, notes: rel.notes },
         instagramUrl: s.instagramUrl,
         auth: { phoneOtp: whatsappEnabled() || smsEnabled(), otpWhatsApp: whatsappEnabled(), otpSms: smsEnabled(), emailCode: true, password: true },
         loyalty: { enabled: s.loyaltyEnabled, pointsPer100: s.loyaltyPointsPer100, maxRedeemPercent: s.loyaltyMaxRedeemPercent, pointValueRupees: 1 },
         firstOrderCoupon: 'FIRST10',
         assistantAi: !!env.GEMINI_API_KEY,
-        version: '2.0.10',
+        version: '2.0.11',
       });
     } catch (e) { next(e); }
   });

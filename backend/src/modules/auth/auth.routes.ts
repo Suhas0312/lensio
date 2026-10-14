@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { env } from '../../config/env';
 import { prisma } from '../../lib/prisma';
 import { ah } from '../../lib/asyncHandler';
-import { badRequest, conflict, notFound } from '../../lib/errors';
+import { AppError, badRequest, conflict, notFound } from '../../lib/errors';
 import { normalizeIndianMobile } from '../../lib/phone';
 import { requireAuth, signToken } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
@@ -31,6 +31,7 @@ async function claimPhone(userId: string, raw: string) {
   if (other && other.id !== userId) throw conflict('PHONE_TAKEN', 'Another account already uses this mobile number. Sign in to that account, or use a different number.');
   return phone;
 }
+const notFoundAccount = () => new AppError(404, 'NO_ACCOUNT', 'There is no Lensio account with this email yet. Create an account to continue.');
 const findByEmail = (email: string) => prisma.user.findFirst({ where: { email }, orderBy: { createdAt: 'asc' } });
 const emailField = z.string().trim().email('Enter a valid email address').transform(normalizeEmail);
 const passwordField = z.string().min(8, 'Use at least 8 characters').max(100);
@@ -76,15 +77,18 @@ r.post('/register', limiter, validate(z.object({ name: z.string().trim().min(1).
 
 r.post('/login', limiter, validate(z.object({ email: emailField, password: z.string().min(1).max(100) })), ah(async (req, res) => {
   const user = await findByEmail(req.body.email);
-  if (!user || !verifyPassword(req.body.password, user.passwordHash)) {
-    if (user && !user.passwordHash) throw badRequest('NO_PASSWORD', 'This account has no password yet. Sign in with an email code, then set a password.');
+  if (!user) throw notFoundAccount();
+  if (!verifyPassword(req.body.password, user.passwordHash)) {
+    if (!user.passwordHash) throw badRequest('NO_PASSWORD', 'This account has no password yet. Sign in with an email code, then set a password.');
     throw badRequest('BAD_LOGIN', 'Email or password is incorrect.');
   }
   res.json(session(await promoteIfAdmin(user)));
 }));
 
 // ---------- Email code (no password needed; also used for password reset) ----------
-r.post('/email-code/send', limiter, validate(z.object({ email: emailField })), ah(async (req, res) => {
+r.post('/email-code/send', limiter, validate(z.object({ email: emailField, purpose: z.enum(['signin', 'reset', 'signup']).optional() })), ah(async (req, res) => {
+  // Sign-in / password reset is for existing accounts; new people are sent to "Create account" (name + mobile).
+  if (req.body.purpose && req.body.purpose !== 'signup' && !(await findByEmail(req.body.email))) throw notFoundAccount();
   await sendEmailCode(req.body.email);
   res.json({ sent: true, expiresInSec: 600 });
 }));
