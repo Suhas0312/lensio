@@ -24,6 +24,8 @@ header h1{font-size:18px;margin:0;flex:1}
 @media (min-width:860px){.layout{flex-direction:row;align-items:flex-start}.stagecol{flex:1.3}.side{flex:1;max-width:380px}}
 .stage{position:relative;width:100%;aspect-ratio:3/4;max-height:68vh;background:#10143a;border-radius:18px;overflow:hidden;touch-action:none;margin:0 auto}
 @media (min-width:860px){.stage{aspect-ratio:4/3;max-height:72vh}}
+.hud{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:3}
+.stage.drop{outline:3px dashed #22d3ee;outline-offset:-8px}
 .stage video,.stage .photo{position:absolute;inset:0;width:100%;height:100%}
 .stage video{object-fit:cover;transform:scaleX(-1)}
 .stage .photo{object-fit:contain;background:#10143a}
@@ -53,6 +55,16 @@ header h1{font-size:18px;margin:0;flex:1}
 .linkbtn{background:none;border:0;color:var(--cyan,#22d3ee);font:inherit;font-size:13px;padding:8px 0 0;cursor:pointer;text-align:left}
 .num{display:block;width:72px;margin-top:4px;padding:9px 10px;border-radius:10px;border:1px solid var(--line,#2a2f6b);background:rgba(255,255,255,.04);color:inherit;font:inherit}
 .shot .actions{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
+.report{border-color:#7c3aed;background:linear-gradient(160deg,rgba(124,58,237,.18),rgba(34,211,238,.08))}
+.rgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:8px 0}
+.rgrid>div{background:rgba(255,255,255,.05);border-radius:12px;padding:8px;display:flex;flex-direction:column;gap:2px}
+.rgrid b{font-size:16px}
+@media (max-width:420px){.rgrid{grid-template-columns:repeat(2,1fr)}}
+.tag{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:700;margin:2px 2px 2px 0}
+.tag.ok{background:#064e3b;color:#6ee7b7}.tag.no{background:#4c1d24;color:#fda4af}
+.picks{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:6px}
+.pick{background:#f4f5fb;border:0;border-radius:12px;padding:6px;display:flex;flex-direction:column;align-items:flex-start;gap:2px;cursor:pointer;color:#0b0f2e;text-align:left}
+.pick img{width:100%;aspect-ratio:2.4;object-fit:contain}.pick span{font-weight:700;font-size:12px}.pick small{font-size:11px;color:#4b5175}
 .swatches{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:-4px}
 .sw{width:30px;height:30px;border-radius:50%;background:var(--c);border:2px solid var(--line);cursor:pointer;padding:0;box-shadow:inset 0 0 0 2px var(--night)}
 .sw.on{border-color:#fff}
@@ -77,7 +89,7 @@ header h1{font-size:18px;margin:0;flex:1}
   <div class="layout">
     <div class="stagecol">
       <div class="stage" id="stage">
-        <div class="face" id="placeholder"><div><div style="font-size:44px">👓</div><p>Turn on your camera or upload a selfie.<br>We'll place the frames on your face automatically.</p></div></div>
+        <div class="face" id="placeholder"><div><div style="font-size:44px">👓</div><p>Turn on your camera, upload a photo from your gallery or files, or drop a photo here.<br>We'll place the frames on your face automatically.</p></div></div>
         <video id="video" playsinline muted autoplay hidden></video>
         <img id="photo" class="photo" alt="Your photo" hidden>
         <img id="overlay" class="overlay" alt="" draggable="false">
@@ -85,17 +97,19 @@ header h1{font-size:18px;margin:0;flex:1}
       </div>
       <div class="actions">
         <button class="btn p" id="camBtn">📷 Live camera</button>
-        <button class="btn" id="selfieBtn">🖼️ Photo from gallery</button>
-        <button class="btn" id="measureBtn">📏 Measure my size</button>
+        <button class="btn" id="selfieBtn">🖼️ Upload photo (gallery / files)</button>
+        <button class="btn p" id="measureBtn">✨ AI face scan</button>
         <button class="btn" id="captureBtn" disabled>📸 Capture</button>
-        <input type="file" id="selfieIn" accept="image/*" hidden>
+        <input type="file" id="selfieIn" accept="image/*,.heic,.heif" hidden>
       </div>
     </div>
     <div class="side">
+      <div class="card report" id="report" hidden aria-live="polite"></div>
       <div class="card" id="shapeCard"><span class="muted small">Face shape</span><div class="shape" id="shapeText">We'll suggest frames once we see your face.</div></div>
       <div class="card" id="sizeCard"><span class="muted small">Frame size</span>
         <div id="sizeText" style="margin:4px 0 10px"></div>
         <div class="chips" id="sizeChips" role="group" aria-label="Frame size"></div>
+        <label class="small" style="display:flex;gap:8px;align-items:center;margin-top:8px"><input type="checkbox" id="voiceChk" checked> 🔊 Speak instructions while measuring</label>
         <button class="linkbtn" id="exactBtn" type="button">📐 Exact size: enter the numbers from your current glasses</button>
         <div id="exactBox" hidden style="margin-top:10px">
           <p class="muted small" style="margin:0 0 8px">Look inside the arm of glasses that fit you well. You'll see numbers like <b>52□18-140</b> (lens width, bridge, arm length).</p>
@@ -120,6 +134,7 @@ header h1{font-size:18px;margin:0;flex:1}
 <div class="shot" id="shot" role="dialog" aria-label="Your try-on photo">
   <img id="shotImg" alt="Your try-on photo">
   <div class="actions">
+    <button class="btn" id="cmpBtn" type="button">🔲 Compare 4 frames</button>
     <button class="btn p" id="saveBtn">💾 Save to gallery</button>
     <button class="btn" id="shareBtn">Share</button>
     <button class="btn" id="useShotBtn">📏 Use this photo for size &amp; frames</button>
@@ -129,6 +144,6 @@ header h1{font-size:18px;margin:0;flex:1}
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <script src="/tryon/face-api.js" defer></script>
-<script src="/tryon/tryon.js?v=7" defer></script>
+<script src="/tryon/tryon.js?v=10" defer></script>
 </body>
 </html>

@@ -595,7 +595,7 @@
         <label class="check"><input type="checkbox" id="setAutoRx" ${s.autoApproveTypedRx ? 'checked' : ''}> <span><b>Auto-approve typed prescriptions</b> that pass every check and aren't high power. Uploaded photos and high powers are always reviewed by a person. Leave this off if your optician should check every prescription.</span></label>
         <p class="muted small" style="margin:0">Courier steps (picked up, in transit, out for delivery, delivered) are automatic once Shiprocket is connected. Until then, add them under an order's <b>Courier & live tracking</b>.</p>
         <div><button class="btn" data-act="enableNotif">${'Notification' in window && Notification.permission === 'granted' ? '✓ Desktop pop-ups are on' : '🔔 Turn on desktop pop-ups'}</button></div></div>
-      <div class="card"><h2>Cash on delivery</h2><label class="check"><input type="checkbox" id="setCod" ${s.codEnabled ? 'checked' : ''}> Offer Cash on Delivery (₹49 fee, orders up to ₹10,000)</label></div>
+      <div class="card"><h2>Payments</h2><p class="muted small">Customers pay by UPI before an order starts. Cash on Delivery is switched off.</p></div>
       <div class="err" id="serr"></div>
       <div><button class="btn p" data-act="saveSettings">Save settings</button></div></div>`);
   }
@@ -809,7 +809,7 @@
         $('#serr').textContent = '';
         try {
           S.data.settings = await api('/admin/settings', { method: 'PUT', body: {
-            upiId: $('#setUpi').value.trim() || null, upiPayeeName: $('#setPayee').value.trim() || 'Lensio', codEnabled: $('#setCod').checked,
+            upiId: $('#setUpi').value.trim() || null, upiPayeeName: $('#setPayee').value.trim() || 'Lensio',
             androidApkUrl: $('#setApk').value.trim() || null, androidLatestVersion: $('#setVer').value.trim() || null, androidMinVersion: $('#setMinVer').value.trim() || null, androidReleaseRepo: $('#setRepo').value.trim().replace(/^https?:\/\/github\.com\//i, '').replace(/\/+$/, '') || null, androidUpdateNotes: $('#setNotes').value.trim() || null, shopInfo: $('#setInfo').value.trim() || null,
             instagramUrl: ($('#setInsta').value.trim().split('?')[0]) || null,
             ownerEmailAlerts: $('#setAlerts').checked, autoStartLensWork: $('#setAutoLens').checked,

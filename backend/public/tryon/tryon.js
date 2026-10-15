@@ -17,7 +17,7 @@
 
   const stage = $('#stage'), video = $('#video'), photo = $('#photo'), overlay = $('#overlay');
   const S = { frames: [], sel: null, mode: 'none', stream: null, face: null, shape: null, manual: null, manualUntil: 0, busy: false, ready: false };
-  window.__lensioTryon = S; // for diagnostics
+  window.__lensioTryon = S; window.__lensioTryonReport = (shape, measure) => { if (measure) S.measure = measure; if (shape) S.shape = shape; showReport(); }; // for diagnostics
 
   // ---------- Face shape → frame suggestions (styling guidance, not a measurement) ----------
   const SUIT = {
@@ -27,6 +27,58 @@
     heart: { label: 'Heart', tip: 'Bottom-heavy or rounded frames balance a wider forehead.', shapes: ['AVIATOR', 'ROUND', 'OVAL', 'RECTANGLE'] },
     long: { label: 'Long', tip: 'Deeper, bolder frames shorten the face visually.', shapes: ['SQUARE', 'WAYFARER', 'AVIATOR', 'GEOMETRIC'] },
   };
+  /** Face shape from the 3D scan proportions (more reliable than the 68-point live estimate). */
+  function classifyMesh(m) {
+    if (m.ratio >= 1.48) return 'long';
+    if (m.brow / m.jaw > 1.28) return 'heart';
+    if (m.ratio < 1.25) return m.jaw > 0.82 ? 'square' : 'round';
+    return 'oval';
+  }
+  const AVOID = {
+    round: { shapes: ['ROUND', 'OVAL'], why: 'Very round frames repeat the curves of your face.' },
+    square: { shapes: ['SQUARE', 'RECTANGLE', 'GEOMETRIC'], why: 'Sharp, boxy frames make a strong jaw look heavier.' },
+    oval: { shapes: [], why: 'Almost every shape suits you. Keep the frame about as wide as your face.' },
+    heart: { shapes: ['CAT_EYE', 'GEOMETRIC'], why: 'Top-heavy, upswept frames widen the forehead further.' },
+    long: { shapes: ['OVAL'], why: 'Small, narrow frames make the face look longer.' },
+  };
+  const WHY = {
+    round: 'Straight lines and corners add structure to soft, round features.',
+    square: 'Curves and rounded edges soften a strong jaw and forehead.',
+    oval: 'Balanced proportions: you can wear bold or subtle styles.',
+    heart: 'Frames wider at the bottom, or rounded, balance a wider forehead and narrow chin.',
+    long: 'Deep, bold frames with a strong top line make the face look shorter and more balanced.',
+  };
+  const SHAPE_NAME = { RECTANGLE: 'Rectangle', ROUND: 'Round', CAT_EYE: 'Cat-eye', AVIATOR: 'Aviator', WAYFARER: 'Wayfarer', SQUARE: 'Square', OVAL: 'Oval', GEOMETRIC: 'Geometric' };
+
+  /** AI face scan report: shape, size, PD, best and avoid shapes with reasons, and frames that suit + fit. */
+  function showReport() {
+    const m = S.measure, sh = S.shape, box = $('#report');
+    if (!box || !m || !sh) return;
+    const best = SUIT[sh].shapes, avoid = AVOID[sh];
+    const score = (f) => (best.includes(f.shape) ? 3 : 0) + (hasSize(f, m.size) ? 3 : 0) - (avoid.shapes.includes(f.shape) ? 4 : 0) + (f.rating || 0) / 5;
+    const picks = [...S.frames].sort((a, b) => score(b) - score(a)).filter((f) => score(f) > 0).slice(0, 6);
+    const esc = (t) => String(t).replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
+    box.innerHTML = `
+      <div class="muted small">✨ Your AI face scan</div>
+      <div class="rgrid">
+        <div><span class="muted small">Face shape</span><b>${SUIT[sh].label}</b></div>
+        <div><span class="muted small">Face width</span><b>${m.face} mm</b></div>
+        <div><span class="muted small">PD</span><b>${m.pd ? m.pd + ' mm' : '—'}</b></div>
+        <div><span class="muted small">Frame size</span><b>${SIZE_LABEL[m.size]}</b></div>
+      </div>
+      <p class="small" style="margin:8px 0 4px"><b>Best for you:</b> ${best.map((s) => `<span class="tag ok">${SHAPE_NAME[s]}</span>`).join(' ')}</p>
+      <p class="muted small" style="margin:0 0 6px">${WHY[sh]}</p>
+      ${avoid.shapes.length ? `<p class="small" style="margin:6px 0 4px"><b>Go easy on:</b> ${avoid.shapes.map((s) => `<span class="tag no">${SHAPE_NAME[s]}</span>`).join(' ')}</p>` : ''}
+      <p class="muted small" style="margin:0 0 8px">${avoid.why}</p>
+      ${picks.length ? `<div class="muted small" style="margin-top:6px">Recommended for you (suits your shape and fits your size)</div>
+      <div class="picks">${picks.map((f) => `<button class="pick" data-id="${esc(f.id)}"><img src="${esc(thumbOf(f))}" alt=""><span>${esc(f.name)}</span><small>${inr(f.basePrice)}${best.includes(f.shape) ? ' · suits you' : ''}</small></button>`).join('')}</div>` : ''}
+      <p class="muted small" style="margin:8px 0 0">Shape advice is a styling guide. Size is a camera estimate (±2 mm); for an exact size use the numbers on your current glasses.</p>`;
+    box.hidden = false;
+    renderStrip();
+    try { localStorage.setItem('lensio.scan', JSON.stringify({ shape: sh, at: Date.now() })); } catch { /* private mode */ }
+    if (S.voice) speak(`Your face shape is ${SUIT[sh].label}. Best frames for you: ${best.slice(0, 2).map((s) => SHAPE_NAME[s]).join(' and ')}.`, true);
+  }
+
   function classify(pts) {
     const d = (a, b) => Math.hypot(pts[a].x - pts[b].x, pts[a].y - pts[b].y);
     const browMid = { x: (pts[19].x + pts[24].x) / 2, y: (pts[19].y + pts[24].y) / 2 };
@@ -179,6 +231,7 @@
   async function select(id) {
     const f = S.frames.find((x) => x.id === id); if (!f) return;
     S.sel = f; S.manual = null; S.color = colorsOf(f)[0].hex;
+    S.tried = [f.id, ...(S.tried || []).filter((x) => x !== f.id)].slice(0, 4);   // "Compare 4 frames" shows these first
     $('#selCard').hidden = false; $('#selName').textContent = f.name;
     showSel(f);
     renderStrip();
@@ -355,19 +408,94 @@
   function sampleFrom(r, W, H) {
     const lm = r && r.multiFaceLandmarks && r.multiFaceLandmarks[0];
     if (!lm || lm.length < 478) return { why: 'noface' };
+    const g = guide(lm, W, H);
+    if (g) return { why: g, lm };
     const P = (i) => ({ x: lm[i].x * W, y: lm[i].y * H }), d = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
     // Horizontal iris width only: eyelids cover the top and bottom of the iris, which made vertical readings
     // too small and every size too big.
     const irisA = d(P(469), P(471)), irisB = d(P(474), P(476));
     const iris = (irisA + irisB) / 2;
-    if (iris < (S.mode === 'photo' ? 12 : 14)) return { why: 'far' };            // need enough pixels for ~1 mm
+    if (iris < (S.mode === 'photo' ? 12 : 14)) return { why: 'far', lm };       // need enough pixels for ~1 mm
     const l = P(234), rt = P(454), nose = P(1), w = d(l, rt);
-    if (Math.abs(irisA - irisB) / iris > 0.10 || Math.abs(nose.x - (l.x + rt.x) / 2) / w > 0.04) return { why: 'turned' };
-    const tilt = Math.abs(Math.atan2(P(473).y - P(468).y, P(473).x - P(468).x));
-    if (tilt > 0.07 && tilt < Math.PI - 0.07) return { why: 'turned' };              // head tilted sideways
+    if (Math.abs(irisA - irisB) / iris > 0.10) return { why: 'turned', lm };
     const mm = IRIS_MM / iris;
-    return { pd: d(P(468), P(473)) * mm, face: w * mm };
+    // Face-shape proportions from the 3D mesh: length (forehead 10 → chin 152), cheekbones (234–454),
+    // jaw (172–397) and forehead/brow width (54–284).
+    const shape = { ratio: d(P(10), P(152)) / w, jaw: d(P(172), P(397)) / w, brow: d(P(54), P(284)) / w };
+    return { pd: d(P(468), P(473)) * mm, face: w * mm, lm, shape };
   }
+  /**
+   * AI face alignment: head pose from the 3D face mesh (MediaPipe gives depth per point).
+   * Returns what the customer should do, or null when the face is straight, level and close enough.
+   */
+  function guide(lm, W, H) {
+    const P = (i) => ({ x: lm[i].x * W, y: lm[i].y * H, z: lm[i].z * W });
+    const l = P(234), r = P(454), nose = P(1), chin = P(152), brow = P(10), eL = P(33), eR = P(263);
+    const faceW = Math.hypot(r.x - l.x, r.y - l.y);
+    if (faceW < W * 0.22) return 'far';
+    if (faceW > W * 0.78) return 'near';
+    if (Math.abs(nose.x / W - 0.5) > 0.22 || Math.abs(nose.y / H - 0.47) > 0.25) return 'center';
+    const roll = Math.atan2(eR.y - eL.y, eR.x - eL.x);
+    if (Math.abs(roll) > 0.06) return 'tilt';
+    // yaw: depth difference between the two cheeks (3D), backed up by where the nose sits
+    const yaw = (r.z - l.z) / faceW, off = (nose.x - (l.x + r.x) / 2) / faceW;
+    if (yaw > 0.12 || off > 0.05) return 'right';   // camera image: nose to the right = turned to their left
+    if (yaw < -0.12 || off < -0.05) return 'left';
+    // pitch: nose position between forehead and chin
+    const pitch = (nose.y - brow.y) / (chin.y - brow.y);
+    if (pitch < 0.47) return 'down';                    // looking up → lower the chin
+    if (pitch > 0.63) return 'up';
+    return null;
+  }
+  const SAY = {
+    noface: 'Look at the camera, please.', far: 'Come a little closer.', near: 'Move back a little.',
+    tilt: 'Keep your head level.', left: 'Turn slightly to your left.', right: 'Turn slightly to your right.',
+    down: 'Lower your chin a little.', up: 'Raise your chin a little.', turned: 'Look straight at the camera.',
+    hold: 'Perfect. Hold still.', center: 'Move your face into the circle.',
+  };
+  const ARROW = { left: '⬅', right: '➡', up: '⬆', down: '⬇', far: '⤢', near: '⤡', tilt: '⟲', center: '◎' };
+  let lastSaid = '', lastSaidAt = 0;
+  /** Speaks a short instruction (app: phone's voice; browser: built-in voice). Never repeats too often. */
+  function speak(text, force) {
+    if (!S.voice || !text) return;
+    const now = Date.now();
+    if (!force && (now - lastSaidAt < 2600 || (text === lastSaid && now - lastSaidAt < 6000))) return;
+    lastSaid = text; lastSaidAt = now;
+    if (inRN) { post({ type: 'speak', text }); return; }
+    try {
+      const u = new SpeechSynthesisUtterance(text); u.lang = 'en-IN'; u.rate = 1.02;
+      speechSynthesis.cancel(); speechSynthesis.speak(u);
+    } catch { /* no voice in this browser */ }
+  }
+  // Face-scan overlay: oval guide, mesh points, progress ring.
+  const hud = document.createElement('canvas'); hud.className = 'hud'; stage.appendChild(hud);
+  function drawHud(lm, W, H, ok, progress, hint) {
+    const sw = stage.clientWidth, sh = stage.clientHeight, dpr = Math.min(window.devicePixelRatio || 1, 2);
+    if (hud.width !== sw * dpr) { hud.width = sw * dpr; hud.height = sh * dpr; }
+    const g = hud.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, sw, sh);
+    const col = ok ? '#22e3a0' : '#f5b84b';
+    // oval target
+    g.save(); g.strokeStyle = col; g.lineWidth = 3; g.setLineDash([10, 8]);
+    g.beginPath(); g.ellipse(sw / 2, sh * 0.45, sw * 0.27, sh * 0.33, 0, 0, Math.PI * 2); g.stroke(); g.restore();
+    if (lm) {
+      g.fillStyle = col;
+      for (let i = 0; i < 468; i += 3) { const p = mapPoint({ x: lm[i].x * W, y: lm[i].y * H }); g.globalAlpha = 0.55; g.fillRect(p.x - 1, p.y - 1, 2, 2); }
+      g.globalAlpha = 1;
+      for (const i of [468, 473]) { const p = mapPoint({ x: lm[i].x * W, y: lm[i].y * H }); g.strokeStyle = '#22d3ee'; g.lineWidth = 2; g.beginPath(); g.arc(p.x, p.y, 6, 0, Math.PI * 2); g.stroke(); }
+      // scanning line
+      const t = (Date.now() % 1600) / 1600, y = sh * (0.12 + 0.66 * t);
+      const grd = g.createLinearGradient(0, y - 18, 0, y + 2); grd.addColorStop(0, 'rgba(34,211,238,0)'); grd.addColorStop(1, 'rgba(34,211,238,.55)');
+      g.fillStyle = grd; g.fillRect(sw * 0.2, y - 18, sw * 0.6, 20);
+    }
+    // progress ring
+    g.lineWidth = 6; g.strokeStyle = 'rgba(255,255,255,.15)'; g.beginPath(); g.arc(sw - 38, 38, 22, 0, Math.PI * 2); g.stroke();
+    g.strokeStyle = '#7c3aed'; g.beginPath(); g.arc(sw - 38, 38, 22, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * progress); g.stroke();
+    g.fillStyle = '#fff'; g.font = '700 12px Quicksand, system-ui'; g.textAlign = 'center'; g.fillText(`${Math.round(progress * 100)}%`, sw - 38, 42);
+    if (hint && ARROW[hint]) { g.font = '700 54px system-ui'; g.fillStyle = col; g.fillText(ARROW[hint], sw / 2, sh * 0.88); }
+    g.textAlign = 'start';
+  }
+  const clearHud = () => { const g = hud.getContext('2d'); g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, hud.width, hud.height); };
+
   const median = (a) => { const s = [...a].sort((x, y) => x - y); return s[Math.floor(s.length / 2)]; };
   /** Average of the middle half: ignores blinks and odd frames. */
   const trimmed = (a) => { const s = [...a].sort((x, y) => x - y), k = Math.floor(s.length / 4), m = s.slice(k, s.length - k); return m.reduce((x, y) => x + y, 0) / m.length; };
@@ -405,15 +533,24 @@
       const samples = [];
       if (S.mode === 'photo') {
         const r = sampleFrom(await meshOnce(fm, photo), photo.naturalWidth, photo.naturalHeight);
-        if (r.pd) samples.push(r); else { toast(r.why === 'far' ? 'Use a closer, sharper selfie.' : 'Use a front-facing selfie, eyes open, no glasses.'); }
+        drawHud(r.lm, photo.naturalWidth, photo.naturalHeight, !!r.pd, r.pd ? 1 : 0, r.why);
+        if (r.pd) samples.push(r); else { toast(r.why === 'far' ? 'Use a closer, sharper photo.' : `${SAY[r.why] || 'Use a front-facing photo'} Use a photo facing the camera, eyes open, no glasses.`); }
+        setTimeout(clearHud, 2500);
       } else {
-        const NEED = 40, until = Date.now() + 20000; let last = '';
+        const NEED = 40, until = Date.now() + 30000; let last = '', wasOk = false;
+        speak('Take off your glasses and look straight at the camera.', true);
         while (samples.length < NEED && Date.now() < until && S.mode === 'live') {
-          const r = sampleFrom(await meshOnce(fm, video), video.videoWidth, video.videoHeight);
-          if (r.pd) samples.push(r); else last = r.why;
-          st(samples.length ? `Measuring… keep still ${Math.round(samples.length / NEED * 100)}%` : `${HINT[last] || 'Measuring…'} · remove glasses`);
-          await new Promise((res) => setTimeout(res, 60));
+          const vw = video.videoWidth, vh = video.videoHeight;
+          const r = sampleFrom(await meshOnce(fm, video), vw, vh);
+          const ok = !!r.pd;
+          if (ok) samples.push(r); else { last = r.why; if (r.why !== 'turned' || samples.length < 5) samples.length = Math.max(0, samples.length - 2); }
+          drawHud(r.lm, vw, vh, ok, samples.length / NEED, ok ? null : r.why);
+          if (ok && !wasOk) speak(SAY.hold); else if (!ok) speak(SAY[r.why]);
+          wasOk = ok;
+          st(ok ? `Scanning… hold still ${Math.round(samples.length / NEED * 100)}%` : `${SAY[last] || 'Measuring…'}`);
+          await new Promise((res) => setTimeout(res, 50));
         }
+        clearHud();
         if (samples.length < 16) { toast('Could not measure. Remove your glasses, face the camera in good light, and try again.'); samples.length = 0; }
         else if (spread(samples.map((s) => s.pd)) > 2.5) { toast('You moved a little. Keep still and tap Measure again for an exact reading.'); samples.length = 0; }
       }
@@ -422,6 +559,12 @@
         if (pd < 50 || pd > 78 || face < 110 || face > 170) toast('That measurement looks off. Try again in better light, facing the camera.');
         else {
           applyMeasure({ face: Math.round(face), pd: Math.round(pd), size: sizeFor(face), photo: S.mode === 'photo', source: 'camera' });
+          const avg = (k) => trimmed(samples.map((s) => s.shape[k]));
+          const shape = classifyMesh({ ratio: avg('ratio'), jaw: avg('jaw'), brow: avg('brow') });
+          S.shape = shape;
+          $('#shapeText').innerHTML = `Your face looks <b>${SUIT[shape].label.toLowerCase()}</b> (3D scan). ${SUIT[shape].tip} Frames marked <b>Suits you</b> are shown first.`;
+          showReport();
+          speak(`Done. Your size is ${SIZE_LABEL[S.measure.size]}. P D ${Math.round(pd)} millimetres.`, true);
           renderSize(); renderStrip();
           const first = orderedFrames()[0];
           if (S.sel && !hasSize(S.sel, S.sizeFilter) && first) await select(first.id);   // switch to a frame in their size
@@ -443,7 +586,7 @@
       ? (m.source === 'glasses'
         ? `From your glasses <b>${m.lens}□${m.bridge}</b> · frame width about <b>${m.face} mm</b>${m.pd ? ` · PD <b>${m.pd} mm</b>` : ''}<br>Your size: <b>${SIZE_LABEL[m.size]}</b> <span class="muted small">(${SIZE_RANGE[m.size]}) · exact</span>`
         : `Face width <b>${m.face} mm</b> · PD <b>${m.pd} mm</b><br>Your size: <b>${SIZE_LABEL[m.size]}</b> <span class="muted small">(${SIZE_RANGE[m.size]}) · camera estimate ±2 mm${m.photo ? ', from a photo' : ''}</span><br><span class="muted small">For an exact size, use the numbers from your current glasses below.</span>`)
-      : 'Tap <b>Measure my size</b> (live camera, glasses off), or pick a size.';
+      : 'Tap <b>✨ AI face scan</b> (live camera, glasses off) for your face shape and size, or pick a size.';
     $('#sizeChips').innerHTML = ['', 'SMALL', 'MEDIUM', 'WIDE'].map((k) => `<button class="chip ${(S.sizeFilter || '') === k ? 'on' : ''}" data-size="${k}">${k ? SIZE_LABEL[k] + (m && m.size === k ? ' ✓' : '') : 'All sizes'}</button>`).join('');
   }
   const hasSize = (f, size) => !size || (f.variants || []).some((v) => v.size === size && (v.stock === undefined || v.stock > 0));
@@ -481,8 +624,50 @@
 
   // ---------- Capture ----------
   let lastShot = null, lastRaw = null;
-  async function capture() {
+  /** The photo (or live camera frame) without any glasses, as a canvas the size of the picture area. */
+  function backgroundCanvas() {
     const W = stage.clientWidth, H = stage.clientHeight, dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const c = document.createElement('canvas'); c.width = W * dpr; c.height = H * dpr;
+    const g = c.getContext('2d'); g.scale(dpr, dpr); g.fillStyle = '#10143a'; g.fillRect(0, 0, W, H);
+    if (S.mode === 'live') {
+      const vw = video.videoWidth, vh = video.videoHeight, k = Math.max(W / vw, H / vh);
+      g.save(); g.translate(W, 0); g.scale(-1, 1); g.drawImage(video, (W - vw * k) / 2, (H - vh * k) / 2, vw * k, vh * k); g.restore();
+    } else if (S.mode === 'photo') {
+      const iw = photo.naturalWidth, ih = photo.naturalHeight, k = Math.min(W / iw, H / ih);
+      g.drawImage(photo, (W - iw * k) / 2, (H - ih * k) / 2, iw * k, ih * k);
+    }
+    return { c, W, H, dpr };
+  }
+  /** "Compare 4 frames": the same photo wearing the current frame and the next three in the list, labelled. */
+  async function compareShot() {
+    if (!lastBase || !S.sel) return null;
+    const tried = (S.tried || []).map((id) => S.frames.find((x) => x.id === id)).filter((f) => f && f !== S.sel);
+    const frames = [S.sel, ...tried, ...orderedFrames().filter((f) => f !== S.sel && !tried.includes(f))].slice(0, 4);
+    const { c: base, W, H } = lastBase, pose = lastPose;
+    const tileW = W, tileH = H, out = document.createElement('canvas');
+    const cols = frames.length > 1 ? 2 : 1, rows = Math.ceil(frames.length / cols), label = 34;
+    out.width = cols * tileW; out.height = rows * (tileH + label);
+    const g = out.getContext('2d'); g.fillStyle = '#040722'; g.fillRect(0, 0, out.width, out.height);
+    for (let i = 0; i < frames.length; i++) {
+      const f = frames[i], x = (i % cols) * tileW, y = Math.floor(i / cols) * (tileH + label);
+      g.drawImage(base, x, y, tileW, tileH);
+      try {
+        const img = new Image(); img.src = await frameOverlay(f, f === S.sel ? S.color : colorsOf(f)[0].hex); await img.decode();
+        const w = pose.w * ((f.frameWidthMm || 136) / ((S.sel.frameWidthMm) || 136)), h = w * img.naturalHeight / img.naturalWidth;
+        g.save(); g.translate(x + pose.cx, y + pose.cy); g.rotate(pose.rot); g.drawImage(img, -w / 2, -h / 2, w, h); g.restore();
+      } catch { /* frame picture unavailable: tile shows the photo only */ }
+      g.fillStyle = i === 0 ? '#7c3aed' : '#10143a'; g.fillRect(x, y + tileH, tileW, label);
+      g.fillStyle = '#fff'; g.font = '700 14px Quicksand, system-ui, sans-serif';
+      g.fillText(`${i + 1}. ${f.name}`.slice(0, 30), x + 10, y + tileH + 22);
+      g.font = '600 13px Quicksand, system-ui, sans-serif'; const pr = inr(f.basePrice); g.fillText(pr, x + tileW - 10 - g.measureText(pr).width, y + tileH + 22);
+    }
+    g.fillStyle = 'rgba(255,255,255,.7)'; g.font = '600 12px Quicksand, sans-serif'; g.fillText('Lensio · compare frames', 10, 16);
+    return out.toDataURL('image/jpeg', 0.9);
+  }
+  let lastBase = null, lastPose = null, singleShot = null;
+  async function capture() {
+    lastBase = backgroundCanvas(); lastPose = currentPose();
+    const { W, H, dpr } = lastBase;
     const c = document.createElement('canvas'); c.width = W * dpr; c.height = H * dpr;
     const g = c.getContext('2d'); g.scale(dpr, dpr); g.fillStyle = '#10143a'; g.fillRect(0, 0, W, H);
     if (S.mode === 'live') {
@@ -497,7 +682,9 @@
     // small watermark
     g.fillStyle = 'rgba(4,7,34,.6)'; g.fillRect(W - 150, H - 30, 142, 22);
     g.fillStyle = '#fff'; g.font = '600 12px Quicksand, sans-serif'; g.fillText(`Lensio · ${S.sel ? S.sel.name : ''}`.slice(0, 26), W - 144, H - 15);
-    lastShot = c.toDataURL('image/jpeg', 0.92);
+    lastShot = singleShot = c.toDataURL('image/jpeg', 0.92);
+    $('#cmpBtn').textContent = '🔲 Compare 4 frames'; $('#cmpBtn').dataset.on = '';
+    $('#cmpBtn').hidden = orderedFrames().length < 2;
     // The plain photo (no frame drawn on it), for "Use this photo for size & frames"
     lastRaw = null;
     if (S.mode === 'live' && video.videoWidth) {
@@ -507,6 +694,9 @@
     } else if (S.mode === 'photo') lastRaw = photo.src;
     $('#useShotBtn').hidden = !lastRaw;
     $('#shotImg').src = lastShot; $('#shot').style.display = 'flex';
+    // Show the 4-frame comparison straight away (one tap on the button switches back to one frame).
+    const cb = $('#cmpBtn'); cb.dataset.on = ''; cb.textContent = '🔲 Compare 4 frames';
+    if (S.frames.length > 1) cb.click();
   }
   async function share() {
     if (inRN) { post({ type: 'capture', dataUrl: lastShot, name: S.sel?.name }); return; }   // app opens its share sheet
@@ -533,8 +723,22 @@
 
   // ---------- Wiring ----------
   $('#camBtn').addEventListener('click', () => (S.stream ? stopCam() : startCam()));
-  $('#selfieBtn').addEventListener('click', () => $('#selfieIn').click());
+  // In the Android app, the app's own picker offers Gallery and Files; in browsers the phone's picker does.
+  $('#selfieBtn').addEventListener('click', () => (inRN && window.__lensioNativePicker ? post({ type: 'pickPhoto' }) : $('#selfieIn').click()));
+  window.__lensioUsePhoto = (dataUrl) => {
+    try {
+      const [head, b64] = String(dataUrl).split(',');
+      const type = (head.match(/data:([^;]+)/) || [])[1] || 'image/jpeg';
+      const bin = atob(b64), bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      useSelfie(new File([bytes], 'photo.jpg', { type }));
+    } catch { toast('Could not open that photo. Try another one.'); }
+  };
   $('#selfieIn').addEventListener('change', (e) => { const f = e.target.files && e.target.files[0]; e.target.value = ''; useSelfie(f); });
+  // Computers: drop a photo onto the picture area.
+  stage.addEventListener('dragover', (e) => { e.preventDefault(); stage.classList.add('drop'); });
+  stage.addEventListener('dragleave', () => stage.classList.remove('drop'));
+  stage.addEventListener('drop', (e) => { e.preventDefault(); stage.classList.remove('drop'); const f = e.dataTransfer && e.dataTransfer.files[0]; if (f) useSelfie(f); });
   $('#captureBtn').addEventListener('click', capture);
   $('#measureBtn').addEventListener('click', measure);
   $('#sizeChips').addEventListener('click', (e) => {
@@ -546,8 +750,22 @@
   $('#shareBtn').addEventListener('click', share);
   $('#saveBtn').addEventListener('click', save);
   $('#useShotBtn').addEventListener('click', useShot);
+  $('#cmpBtn').addEventListener('click', async () => {
+    const b = $('#cmpBtn');
+    if (b.dataset.on) { lastShot = singleShot; b.dataset.on = ''; b.textContent = '🔲 Compare 4 frames'; }
+    else {
+      b.disabled = true; b.textContent = 'Making comparison…';
+      const url = await compareShot(); b.disabled = false;
+      if (!url) { b.textContent = '🔲 Compare 4 frames'; return; }
+      lastShot = url; b.dataset.on = '1'; b.textContent = '👓 Show one frame';
+    }
+    $('#shotImg').src = lastShot;
+  });
+  $('#report').addEventListener('click', (e) => { const b = e.target.closest('.pick'); if (b) { select(b.dataset.id); window.scrollTo({ top: 0, behavior: 'smooth' }); } });
   $('#exactBtn').addEventListener('click', () => { $('#exactBox').hidden = !$('#exactBox').hidden; });
   $('#exSave').addEventListener('click', exactFromGlasses);
+  S.voice = true;
+  $('#voiceChk').addEventListener('change', () => { S.voice = $('#voiceChk').checked; if (!S.voice) { try { speechSynthesis.cancel(); } catch { /* none */ } } });
   $('#closeShot').addEventListener('click', () => { $('#shot').style.display = 'none'; });
   $('#swatches').addEventListener('click', async (e) => {
     const b = e.target.closest('.sw'); if (!b || b.dataset.hex === S.color) return;
