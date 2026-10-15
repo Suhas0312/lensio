@@ -100,8 +100,33 @@ const resting = new Map<string, number>();       // key → time it may be used 
 const REST_MS = 10 * 60_000;
 export const _resetGeminiKeys = () => resting.clear();
 
+/**
+ * Models to try, in order: the configured one, then current Flash models. Google retires model versions
+ * (gemini-2.5-flash ends 16 Oct 2026), so a 404 moves on to the next name instead of breaking Ask Lensio.
+ */
+const MODEL_FALLBACKS = ['gemini-flash-latest', 'gemini-3.5-flash', 'gemini-3.1-flash-lite', 'gemini-flash-lite-latest'];
+export const geminiModels = () => [...new Set([env.GEMINI_MODEL, ...MODEL_FALLBACKS].filter(Boolean))];
+let workingModel: string | null = null;           // remembered after the first success
+export const _resetGeminiModel = () => { workingModel = null; };
+
 async function callGemini(key: string, system: string, contents: object[]): Promise<string> {
-  const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(env.GEMINI_MODEL)}:generateContent`, {
+  const models = workingModel ? [workingModel, ...geminiModels().filter((m) => m !== workingModel)] : geminiModels();
+  let last: unknown;
+  for (const model of models) {
+    try {
+      const text = await callModel(model, key, system, contents);
+      workingModel = model;
+      return text;
+    } catch (e) {
+      last = e;
+      if ((e as { status?: number }).status !== 404) throw e;      // only "model not found" moves to the next model
+    }
+  }
+  throw last;
+}
+
+async function callModel(model: string, key: string, system: string, contents: object[]): Promise<string> {
+  const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
     body: JSON.stringify({ systemInstruction: { parts: [{ text: system }] }, contents, generationConfig: { temperature: 0.4, maxOutputTokens: 600 } }),
@@ -120,16 +145,16 @@ export async function testGeminiKeys() {
     status === 400 && /api key not valid|API_KEY_INVALID/i.test(msg) ? 'Key not valid: create a new key at aistudio.google.com → Get API key (it starts with "AIza").'
       : status === 403 ? 'Key refused: the Gemini API is not enabled for this key, or the key is restricted. Create a new key in AI Studio.'
       : status === 429 ? 'Free limit reached for now: it resets later (or add a backup key from a different Google account).'
-      : status === 404 ? `Model "${env.GEMINI_MODEL}" not available for this key.`
+      : status === 404 ? `None of the Gemini models (${geminiModels().join(', ')}) is available for this key. Check the key in AI Studio, or set GEMINI_MODEL in Render to a model your key lists.`
       : `Google answered ${status ?? 'with an error'}: ${msg.slice(0, 120)}`;
   const out: { name: string; set: boolean; looksRight: boolean; ok: boolean; message: string }[] = [];
   for (const [name, key] of [['GEMINI_API_KEY', env.GEMINI_API_KEY], ['GEMINI_API_KEY_2', env.GEMINI_API_KEY_2]] as const) {
     if (!key) { out.push({ name, set: false, looksRight: false, ok: false, message: 'Not set in Render → Environment.' }); continue; }
-    const looksRight = key.startsWith('AIza');
+    const looksRight = true;   // Google key formats vary ("AIza…", "AQ.…"); the live test below is what counts
     try {
       await callGemini(key, 'Reply with the single word OK.', [{ role: 'user', parts: [{ text: 'ping' }] }]);
       resting.delete(key);
-      out.push({ name, set: true, looksRight, ok: true, message: 'Working ✓' });
+      out.push({ name, set: true, looksRight, ok: true, message: `Working ✓ (model ${workingModel})` });
     } catch (e) {
       out.push({ name, set: true, looksRight, ok: false, message: plain((e as { status?: number }).status, (e as Error).message) });
     }

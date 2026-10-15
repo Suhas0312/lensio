@@ -179,8 +179,8 @@ describe('admin "Test AI keys"', () => {
       ? { ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: 'OK' }] } }] }) }
       : { ok: false, status: 400, text: async () => 'API key not valid. Please pass a valid API key.' });
     const r = await testGeminiKeys();
-    expect(r[0]).toMatchObject({ name: 'GEMINI_API_KEY', ok: false, looksRight: false }); expect(r[0].message).toMatch(/Key not valid/);
-    expect(r[1]).toMatchObject({ name: 'GEMINI_API_KEY_2', ok: true, message: 'Working ✓' });
+    expect(r[0]).toMatchObject({ name: 'GEMINI_API_KEY', ok: false }); expect(r[0].message).toMatch(/Key not valid/);
+    expect(r[1]).toMatchObject({ name: 'GEMINI_API_KEY_2', ok: true }); expect(r[1].message).toMatch(/^Working ✓/);
     e.GEMINI_API_KEY_2 = undefined;
     expect((await testGeminiKeys())[1]).toMatchObject({ set: false });
     e.GEMINI_API_KEY = undefined;
@@ -188,5 +188,26 @@ describe('admin "Test AI keys"', () => {
   it('gives a useful answer for a face photo when the AI is off', async () => {
     const r = await chat([{ role: 'user', text: 'suggest a frame' }], null, { mime: 'image/jpeg', data: 'AAAA' });
     expect(r.reply).toMatch(/AI face scan/); expect(r.reply).toMatch(/Vista Rectangle/);
+  });
+});
+
+describe('retired Gemini models', () => {
+  it('moves from a retired model (404) to the current Flash model and remembers it', async () => {
+    const { env } = await import('../../config/env');
+    const { _resetGeminiModel, _resetGeminiKeys } = await import('./assistant.service');
+    _resetGeminiModel(); _resetGeminiKeys();
+    const e = env as { GEMINI_API_KEY?: string; GEMINI_MODEL: string };
+    const before = e.GEMINI_MODEL; e.GEMINI_API_KEY = 'AQ.new-style-key'; e.GEMINI_MODEL = 'gemini-2.5-flash';
+    const urls: string[] = [];
+    vi.stubGlobal('fetch', async (u: string) => {
+      urls.push(u.split('/models/')[1].split(':')[0]);
+      return u.includes('gemini-2.5-flash') ? { ok: false, status: 404, text: async () => 'model not found' }
+        : { ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: 'Try Vista Rectangle.' }] } }] }) };
+    });
+    const a = await chat([{ role: 'user', text: 'hi' }], null);
+    await chat([{ role: 'user', text: 'again' }], null);
+    e.GEMINI_API_KEY = undefined; e.GEMINI_MODEL = before;
+    expect(a.mode).toBe('ai');
+    expect(urls).toEqual(['gemini-2.5-flash', 'gemini-flash-latest', 'gemini-flash-latest']);
   });
 });

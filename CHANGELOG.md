@@ -5,6 +5,10 @@ Server versions are shown in `/v1/config` and the admin header. App versions are
 ## Server 2.0.11
 - **Automatic app releases:** Lensio reads the newest GitHub release (tag like v2.0.2, .apk attached, not a pre-release) of the repo in the APK link (or Admin → Settings → GitHub repo). Within 5 minutes the download page, `/download/lensio.apk` and the customers' update window switch to it, with the release notes as “What's new”. No admin step. Admin settings show “Automatic ✓ v2.0.1” or what to fix; manual fields remain as fallback. Optional `GITHUB_TOKEN` env raises GitHub's rate limit.
 
+## Server 3.1.3 · Current Gemini model
+- **Ask Lensio AI works again with current keys:** Google retires gemini-2.5-flash on 16 Oct 2026 and new keys can't use it (“model not available”). Lensio now uses **gemini-flash-latest** (always Google's current Flash) and, if a model is retired, automatically tries gemini-3.5-flash and gemini-3.1-flash-lite. The working model is remembered and shown in “Test AI keys”.
+- Removed the “should start with AIza” warning: newer Google keys can look different (e.g. “AQ.”); the live test is what counts.
+
 ## Server 3.1.2 · AI key check
 - **Admin → Settings → “Test AI keys”:** checks GEMINI_API_KEY and GEMINI_API_KEY_2 with Google and says in plain words: working, key not valid (e.g. an “AQ.” token instead of an “AIza” key), refused, free limit reached, or not set.
 - Photo sent while the AI is off: points to the ✨ AI face scan (works without a key) and shows popular frames, instead of a dead end.

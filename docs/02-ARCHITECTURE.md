@@ -131,7 +131,7 @@ mobile/
 ### AI assistant (`modules/assistant`)
 - For every question, the server builds a context from the database: active catalog (up to 60 frames), lens packages, coatings, payment options, the owner's "shop information" from Settings, and **the signed-in customer's own last 5 orders**.
 - A system prompt fixes the rules: only recommend listed frames, no medical advice or diagnosis, send returns and complaints to WhatsApp.
-- It calls Gemini (`GEMINI_MODEL`, default `gemini-2.5-flash`). If there's no key, or Gemini errors, it falls back to rule-based answers.
+- It calls Gemini (`GEMINI_MODEL`, default `gemini-flash-latest`, which always points at Google's current Flash model; retired models fall back automatically). If there's no key, or Gemini errors, it falls back to rule-based answers.
 - Frame names in the reply become product cards. A `[HANDOFF]` tag in the reply shows a WhatsApp button.
 - Rate limits are 10 requests/minute and 150/day per IP.
 
