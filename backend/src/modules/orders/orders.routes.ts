@@ -177,7 +177,11 @@ r.get('/:id', ah(async (req, res) => {
   if (!o) throw notFound('Order');
   const reached = new Map(o.events.map((e) => [e.status, e.createdAt]));
   const currentIdx = TRACK_STAGES.indexOf(o.status);
-  const stages = o.needsPrescription ? TRACK_STAGES : TRACK_STAGES.filter((s) => s !== 'PRESCRIPTION_VERIFIED' && s !== 'LENS_CUTTING_FITTING');
+  // Power lenses: every step. Zero-power lenses: no prescription step (auto-approved), but lens fitting.
+  // Frame only / sunglasses without power: neither.
+  const hasLenses = o.items.some((i) => i.lensPackageId);
+  const stages = o.needsPrescription ? TRACK_STAGES
+    : TRACK_STAGES.filter((s) => s !== 'PRESCRIPTION_VERIFIED' && (hasLenses || s !== 'LENS_CUTTING_FITTING'));
   const timeline = stages.map((s) => ({
     status: s, label: STATUS_LABEL[s],
     done: o.status !== 'CANCELLED' && (reached.has(s) || (currentIdx >= 0 && TRACK_STAGES.indexOf(s) <= currentIdx)),

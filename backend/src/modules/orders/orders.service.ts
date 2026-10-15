@@ -150,7 +150,11 @@ export async function runAutomation(orderId: string) {
 
   if (o.status === 'PLACED') {
     if (!rxItems.length) {
-      if (s.frameOnlyToQc) await transition(o.id, 'QUALITY_CHECK', { force: true, automated: true, quiet: true, note: 'No prescription lenses: preparing for dispatch' });
+      // No power lenses: nothing for the shop to approve. Zero-power / plain lenses still get cut and fitted;
+      // frame-only orders and sunglasses without power go straight to quality check.
+      const hasLenses = o.items.some((i) => i.lensPackage);
+      if (hasLenses) await transition(o.id, 'LENS_CUTTING_FITTING', { automated: true, quiet: true, note: 'Zero-power lenses: no prescription needed, lens work started' });
+      else if (s.frameOnlyToQc) await transition(o.id, 'QUALITY_CHECK', { force: true, automated: true, quiet: true, note: 'No prescription lenses: preparing for dispatch' });
       return;
     }
     if (s.autoApproveTypedRx) {

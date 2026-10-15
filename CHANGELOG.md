@@ -9,6 +9,10 @@ Server versions are shown in `/v1/config` and the admin header. App versions are
 - **← Back on every screen:** all screens with a header (product, cart, checkout, wishlist, compare, Ask Lensio, orders, eye test, stores, rewards…), the Shop/Orders/Account tabs and the sign-in screen. Goes to the previous screen, or Home when a page was opened directly from a link. Try-on's ← now works when opened from the tab bar. Tested on 12 screens.
 - **Ask Lensio greetings:** understands “Hlo”, “helo”, “hii”, “hai”, “heyy”, “Namaskara”, “good morning” and similar.
 
+## 3.3.0 (server update, same version)
+- **Prescription approval only for power lenses:** zero-power glasses are approved automatically and go straight to lens fitting (they used to skip fitting, or wait if “frame-only to QC” was off); frames only and plain sunglasses go to quality check; power lenses always wait for the shop. Order tracking shows the right steps. Tested.
+- **Design library:** docs/catalog/lensio-design-library.csv: 309 original generic frame designs (1,545 colour options) to import hidden and switch on the ones you stock.
+
 ## 3.3.0 · Server + Android app + website
 - **App versions only when you raise them:** the release robot builds a new app only when "version" in mobile/app.json is raised (small fixes don't create versions). Manual run can force one.
 - **No more Render “Application loading” page:** a free GitHub robot visits the server every 10 minutes so it doesn't sleep, and the app shows “Starting try-on…” while the server wakes.

@@ -55,6 +55,30 @@ describe('order automation', () => {
     expect(customerMsgs).not.toContain('QUALITY_CHECK'); // quiet in-between step
   });
 
+  it('zero-power glasses need no prescription approval: lens work starts straight away', async () => {
+    db.order = newOrder([{ ...lensItem(null), lensPackage: { name: 'Zero power + blue cut', lensType: 'ZERO_POWER' } }]);
+    db.order.needsPrescription = false;
+    await onOrderPlaced('o1'); await settle();
+    expect(db.order.status).toBe('LENS_CUTTING_FITTING');
+    expect(db.events).toEqual(['LENS_CUTTING_FITTING']);
+  });
+
+  it('zero-power orders never get stuck, even with "frame-only to QC" switched off', async () => {
+    settings.frameOnlyToQc = false;
+    db.order = newOrder([{ ...lensItem(null), lensPackage: { name: 'Zero power', lensType: 'ZERO_POWER' } }]);
+    db.order.needsPrescription = false;
+    await onOrderPlaced('o1'); await settle();
+    expect(db.order.status).toBe('LENS_CUTTING_FITTING');
+  });
+
+  it('power lenses always wait for the shop to approve the prescription', async () => {
+    db.rx.set('rx1', { id: 'rx1', status: 'PENDING_REVIEW', source: 'MANUAL', isHighPower: false, odSph: -2, osSph: -2 });
+    db.order = newOrder([lensItem('rx1')]);
+    await onOrderPlaced('o1'); await settle();
+    expect(db.order.status).toBe('PLACED');
+    expect(db.rx.get('rx1')!.status).toBe('PENDING_REVIEW');
+  });
+
   it('waits for an uploaded prescription to be reviewed by a person', async () => {
     db.rx.set('rx1', { id: 'rx1', status: 'PENDING_REVIEW', source: 'UPLOAD', isHighPower: false, odSph: null, osSph: null });
     db.order = newOrder([lensItem('rx1')]);
