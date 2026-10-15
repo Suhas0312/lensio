@@ -573,7 +573,11 @@
         <label>Instagram profile link<input id="setInsta" placeholder="https://www.instagram.com/yourshop" value="${esc(s.instagramUrl || '')}"></label></div>
       <div class="card"><h2>AI assistant: shop information</h2>
         <p class="muted small">The in-app assistant uses this to answer questions about your shop. Write it like you'd tell a new staff member: returns and exchanges, warranty, store address and hours, delivery areas, anything customers often ask.</p>
-        <textarea id="setInfo" rows="6" placeholder="e.g. Returns: 7 days for unused frames. Lenses made to prescription can't be returned. Store: HSR Layout, Bengaluru, open 10am–8pm. We deliver across India.">${esc(s.shopInfo || '')}</textarea></div>
+        <textarea id="setInfo" rows="6" placeholder="e.g. Returns: 7 days for unused frames. Lenses made to prescription can't be returned. Store: HSR Layout, Bengaluru, open 10am–8pm. We deliver across India.">${esc(s.shopInfo || '')}</textarea>
+        <h3 style="margin:14px 0 4px">AI (Gemini) for smart answers and photo search</h3>
+        <p class="muted small">Keys are set in Render → Environment as <b>GEMINI_API_KEY</b> and optional backup <b>GEMINI_API_KEY_2</b> (free at aistudio.google.com → Get API key; they start with “AIza”).</p>
+        <div><button class="btn" data-act="testAi">Test AI keys</button></div>
+        <div id="aiTest" class="small" style="margin-top:8px"></div></div>
       <div class="card"><h2>Android app download</h2>
         ${releaseStatus(S.data.release)}
         <label>GitHub repo with your app releases (automatic updates)<input id="setRepo" placeholder="Suhas0312/lensio" value="${esc(s.androidReleaseRepo || '')}" style="max-width:280px"></label>
@@ -805,6 +809,15 @@
       }
       if (act === 'pickQr') return $('#qrInput').click();
       if (act === 'qrDel') { S.data.settings = await api('/admin/settings', { method: 'PUT', body: { upiQrImage: null } }); toast('QR image removed'); return render(); }
+      if (act === 'testAi') {
+        el.disabled = true; $('#aiTest').textContent = 'Testing with Google…';
+        try {
+          const r = await api('/admin/assistant/test', { body: {} });
+          $('#aiTest').innerHTML = r.keys.map((k) => `<div style="margin:4px 0"><b>${esc(k.name)}</b>: <span class="pill ${k.ok ? 'ok' : k.set ? 'warn' : ''}">${esc(k.message)}</span>${k.set && !k.looksRight ? ' <span class="muted">(this value does not start with “AIza”)</span>' : ''}</div>`).join('')
+            + (r.keys.some((k) => k.ok) ? '<p class="small">Ask Lensio is using the AI ✓ (photo search works).</p>' : '<p class="small">No key is working, so Ask Lensio uses built-in answers and cannot read photos.</p>');
+        } catch (e) { $('#aiTest').textContent = 'Test failed: ' + e.message; }
+        el.disabled = false; return;
+      }
       if (act === 'saveSettings') {
         $('#serr').textContent = '';
         try {

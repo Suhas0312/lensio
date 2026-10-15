@@ -5,6 +5,10 @@ Server versions are shown in `/v1/config` and the admin header. App versions are
 ## Server 2.0.11
 - **Automatic app releases:** Lensio reads the newest GitHub release (tag like v2.0.2, .apk attached, not a pre-release) of the repo in the APK link (or Admin → Settings → GitHub repo). Within 5 minutes the download page, `/download/lensio.apk` and the customers' update window switch to it, with the release notes as “What's new”. No admin step. Admin settings show “Automatic ✓ v2.0.1” or what to fix; manual fields remain as fallback. Optional `GITHUB_TOKEN` env raises GitHub's rate limit.
 
+## Server 3.1.2 · AI key check
+- **Admin → Settings → “Test AI keys”:** checks GEMINI_API_KEY and GEMINI_API_KEY_2 with Google and says in plain words: working, key not valid (e.g. an “AQ.” token instead of an “AIza” key), refused, free limit reached, or not set.
+- Photo sent while the AI is off: points to the ✨ AI face scan (works without a key) and shows popular frames, instead of a dead end.
+
 ## Server 3.1.1 · Backup AI key
 - **GEMINI_API_KEY_2** (optional): Ask Lensio uses GEMINI_API_KEY first and switches to the backup automatically when the first key hits its free limit, is rejected or Google has an error. A key that hit its limit rests 10 minutes. If both fail, built-in answers reply. Tested.
 - Startup warning in Render logs if a Gemini key doesn't look like one (AI Studio keys start with “AIza”).

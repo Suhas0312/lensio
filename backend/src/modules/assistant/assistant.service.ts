@@ -114,6 +114,29 @@ async function callGemini(key: string, system: string, contents: object[]): Prom
   return text;
 }
 
+/** Admin "Test AI keys": asks Google with each key and explains the result in plain words. */
+export async function testGeminiKeys() {
+  const plain = (status: number | undefined, msg: string) =>
+    status === 400 && /api key not valid|API_KEY_INVALID/i.test(msg) ? 'Key not valid: create a new key at aistudio.google.com → Get API key (it starts with "AIza").'
+      : status === 403 ? 'Key refused: the Gemini API is not enabled for this key, or the key is restricted. Create a new key in AI Studio.'
+      : status === 429 ? 'Free limit reached for now: it resets later (or add a backup key from a different Google account).'
+      : status === 404 ? `Model "${env.GEMINI_MODEL}" not available for this key.`
+      : `Google answered ${status ?? 'with an error'}: ${msg.slice(0, 120)}`;
+  const out: { name: string; set: boolean; looksRight: boolean; ok: boolean; message: string }[] = [];
+  for (const [name, key] of [['GEMINI_API_KEY', env.GEMINI_API_KEY], ['GEMINI_API_KEY_2', env.GEMINI_API_KEY_2]] as const) {
+    if (!key) { out.push({ name, set: false, looksRight: false, ok: false, message: 'Not set in Render → Environment.' }); continue; }
+    const looksRight = key.startsWith('AIza');
+    try {
+      await callGemini(key, 'Reply with the single word OK.', [{ role: 'user', parts: [{ text: 'ping' }] }]);
+      resting.delete(key);
+      out.push({ name, set: true, looksRight, ok: true, message: 'Working ✓' });
+    } catch (e) {
+      out.push({ name, set: true, looksRight, ok: false, message: plain((e as { status?: number }).status, (e as Error).message) });
+    }
+  }
+  return out;
+}
+
 /** Tries the main key, then the backup. A key that hit its limit (429) rests for 10 minutes. */
 async function askGemini(system: string, history: ChatMessage[], image?: ChatImage): Promise<string> {
   const contents = history.map((m) => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.text }] as object[] }));
@@ -269,15 +292,23 @@ function basicAnswer(q: string, c: Ctx): string {
 /** Without the AI, a photo can't be understood: say so and offer the text alternatives. */
 const PHOTO_NEEDS_AI = "I can't look at photos right now. Tell me about the frame instead (for example \"black round metal frames under 2000\") and I'll find similar ones. For a prescription, type the values (like \"-2.5 SPH, -0.75 CYL\") or save the photo under Account → Prescriptions → Add, and our optician will check it.";
 
+/** Photo sent while the AI is off: still point to something that works. */
+function photoFallback(q: string, c: Ctx) {
+  const t = q.toLowerCase();
+  if (/prescription|power|sph|cyl|rx/.test(t)) return "I can't read photos right now. Save your prescription photo under Account → Prescriptions → Add and our optician will check it, or type the values here (like \"-2.5 SPH, -0.75 CYL\") and I'll suggest the right lens.";
+  const top = c.products.slice(0, 3).map((p) => `${p.name} ${rupees(p.basePrice)}`).join(', ');
+  return `I can't look at photos right now, but the ✨ AI face scan in the Try on tab reads your face shape, size and PD and picks frames that suit you, in about 10 seconds.${top ? ` Popular right now: ${top}.` : ''} You can also tell me your face shape or a style, like "black rectangle frames under 2000".`;
+}
+
 export async function chat(history: ChatMessage[], userId: string | null, image?: ChatImage): Promise<ChatReply> {
   const ctx = await buildContext(userId);
   const last = history[history.length - 1]?.text ?? '';
   let reply: string; let mode: ChatReply['mode'] = 'basic';
   if (geminiKeys().length) {
     try { reply = await askGemini(systemPrompt(ctx), history, image); mode = 'ai'; }
-    catch (err) { logger.warn({ err }, 'Assistant AI failed; using basic answers'); reply = image ? PHOTO_NEEDS_AI : basicAnswer(last, ctx); }
+    catch (err) { logger.warn({ err }, 'Assistant AI failed; using basic answers'); reply = image ? photoFallback(last, ctx) : basicAnswer(last, ctx); }
   } else {
-    reply = image ? PHOTO_NEEDS_AI : basicAnswer(last, ctx);
+    reply = image ? photoFallback(last, ctx) : basicAnswer(last, ctx);
   }
   const handoff = reply.includes('[HANDOFF]');
   reply = reply.replace(/\s*\[HANDOFF\]\s*/g, ' ').trim();

@@ -168,3 +168,25 @@ describe('backup Gemini key', () => {
     expect(r.mode).toBe('basic'); expect(r.reply).toMatch(/frame \+ lenses/);
   });
 });
+
+describe('admin "Test AI keys"', () => {
+  it('explains a wrong key, a working key and a missing key in plain words', async () => {
+    const { env } = await import('../../config/env');
+    const { testGeminiKeys } = await import('./assistant.service');
+    const e = env as { GEMINI_API_KEY?: string; GEMINI_API_KEY_2?: string };
+    e.GEMINI_API_KEY = 'AQ.wrong-token'; e.GEMINI_API_KEY_2 = 'AIzaGood';
+    vi.stubGlobal('fetch', async (_u: string, init: any) => init.headers['x-goog-api-key'] === 'AIzaGood'
+      ? { ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: 'OK' }] } }] }) }
+      : { ok: false, status: 400, text: async () => 'API key not valid. Please pass a valid API key.' });
+    const r = await testGeminiKeys();
+    expect(r[0]).toMatchObject({ name: 'GEMINI_API_KEY', ok: false, looksRight: false }); expect(r[0].message).toMatch(/Key not valid/);
+    expect(r[1]).toMatchObject({ name: 'GEMINI_API_KEY_2', ok: true, message: 'Working ✓' });
+    e.GEMINI_API_KEY_2 = undefined;
+    expect((await testGeminiKeys())[1]).toMatchObject({ set: false });
+    e.GEMINI_API_KEY = undefined;
+  });
+  it('gives a useful answer for a face photo when the AI is off', async () => {
+    const r = await chat([{ role: 'user', text: 'suggest a frame' }], null, { mime: 'image/jpeg', data: 'AAAA' });
+    expect(r.reply).toMatch(/AI face scan/); expect(r.reply).toMatch(/Vista Rectangle/);
+  });
+});

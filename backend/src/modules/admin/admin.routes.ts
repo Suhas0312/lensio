@@ -12,6 +12,7 @@ import { validatePrescription } from '../prescriptions/rx.rules';
 import { orderInclude, transition } from '../orders/orders.service';
 import { STATUS_LABEL } from '../notifications/whatsapp.service';
 import { androidRelease } from '../settings/appRelease';
+import { testGeminiKeys } from '../assistant/assistant.service';
 import { getSettings, saveSettings } from '../settings/settings.service';
 import { sendMail } from '../../lib/mail';
 import { notifyEyeTest, notifyOrderUpdate } from '../notifications/whatsapp.service';
@@ -363,6 +364,8 @@ r.post('/coupons', adminOnly, validate(z.object({
 
 // ---------- Shop settings ----------
 r.get('/settings', ah(async (_req, res) => { res.json(await getSettings()); }));
+/** Settings → "Test AI keys" for Ask Lensio. */
+r.post('/assistant/test', ah(async (_req, res) => { res.json({ keys: await testGeminiKeys() }); }));
 /** What customers get right now: the automatic GitHub release (or the admin fallback), for the settings page. */
 r.get('/app-release', adminOnly, ah(async (_req, res) => { res.json(await androidRelease()); }));
 
