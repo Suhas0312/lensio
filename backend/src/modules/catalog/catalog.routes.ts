@@ -151,9 +151,10 @@ r.get('/fit-guide', ah(async (req, res) => {
 r.get('/wishlist', requireAuth, ah(async (req, res) => {
   const items = await prisma.wishlistItem.findMany({
     where: { userId: req.user!.id }, orderBy: { createdAt: 'desc' },
-    include: { product: { include: { images: { take: 1, orderBy: { sortOrder: 'asc' } } } } },
+    include: { product: { include: { images: { orderBy: { sortOrder: 'asc' } }, variants: true } } },
   });
-  res.json(items.map((i) => i.product));
+  // Only frames still on sale (the app's frame cards need colours/variants too)
+  res.json(items.map((i) => i.product).filter((p) => p.isActive));
 }));
 r.put('/wishlist/:productId', requireAuth, ah(async (req, res) => {
   await prisma.wishlistItem.upsert({

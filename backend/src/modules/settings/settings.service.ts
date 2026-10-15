@@ -27,7 +27,7 @@ export interface ShopSettings {
   reviewsAutoApprove: boolean;         // customer reviews go live immediately instead of waiting for moderation
 }
 
-const DEFAULTS: ShopSettings = { upiId: null, upiPayeeName: 'Lensio', upiQrImage: null, codEnabled: true, androidApkUrl: null, androidLatestVersion: null, androidMinVersion: null, androidUpdateNotes: null, androidReleaseRepo: null, shopInfo: null, instagramUrl: null,
+const DEFAULTS: ShopSettings = { upiId: null, upiPayeeName: 'Lensio', upiQrImage: null, codEnabled: false, androidApkUrl: null, androidLatestVersion: null, androidMinVersion: null, androidUpdateNotes: null, androidReleaseRepo: null, shopInfo: null, instagramUrl: null,
   ownerEmailAlerts: true, autoStartLensWork: true, autoApproveTypedRx: false, frameOnlyToQc: true,
   loyaltyEnabled: true, loyaltyPointsPer100: 5, loyaltyMaxRedeemPercent: 20, reviewsAutoApprove: true };
 
@@ -42,7 +42,7 @@ export async function getSettings(): Promise<ShopSettings> {
     upiId: m.upiId || null,
     upiPayeeName: m.upiPayeeName || DEFAULTS.upiPayeeName,
     upiQrImage: m.upiQrImage || null,
-    codEnabled: m.codEnabled === undefined ? DEFAULTS.codEnabled : m.codEnabled === 'true',
+    codEnabled: false,   // Cash on Delivery removed: UPI / online payment only (anti-fraud). Old COD orders still complete in admin.
     androidApkUrl: m.androidApkUrl || null,
     androidLatestVersion: m.androidLatestVersion || null,
     androidMinVersion: m.androidMinVersion || null,

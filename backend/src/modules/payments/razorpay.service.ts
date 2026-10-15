@@ -6,7 +6,7 @@ import { AppError } from '../../lib/errors';
 let client: Razorpay | null = null;
 export function rzp(): Razorpay {
   if (!env.RAZORPAY_KEY_ID || !env.RAZORPAY_KEY_SECRET)
-    throw new AppError(503, 'PAYMENTS_UNAVAILABLE', 'Online payments are not set up yet. Choose Cash on Delivery.');
+    throw new AppError(503, 'PAYMENTS_UNAVAILABLE', 'Online card payments are not set up yet. Pay by UPI instead.');
   client ??= new Razorpay({ key_id: env.RAZORPAY_KEY_ID, key_secret: env.RAZORPAY_KEY_SECRET });
   return client;
 }

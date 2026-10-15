@@ -64,7 +64,7 @@ export const isProd = env.NODE_ENV === 'production';
 
 if (isProd) {
   if (!env.RAZORPAY_KEY_ID || !env.RAZORPAY_KEY_SECRET || !env.RAZORPAY_WEBHOOK_SECRET)
-    console.warn('Razorpay keys not set: only Cash on Delivery will work until you add them.');
+    console.warn('Razorpay keys not set: customers pay by UPI (QR) until you add them.');
   if (!env.BREVO_API_KEY || !env.MAIL_FROM)
     console.warn(env.OTP_LOG_CODES === 'true'
       ? 'SETUP MODE: email not configured, sign-in codes are printed to this log. Add BREVO_API_KEY + MAIL_FROM, then remove OTP_LOG_CODES.'
