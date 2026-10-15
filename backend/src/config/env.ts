@@ -46,7 +46,8 @@ const schema = z.object({
   MAIL_FROM: z.string().optional(),
   MAIL_FROM_NAME: z.string().default('Lensio'),
   /** Google Gemini API key (free tier at aistudio.google.com) for the in-app AI assistant. */
-  GEMINI_API_KEY: z.string().optional(),
+  GEMINI_API_KEY: z.string().trim().optional(),
+  GEMINI_API_KEY_2: z.string().trim().optional(),   // backup key: used when the first one hits its limit or fails
   GEMINI_MODEL: z.string().default('gemini-2.5-flash'),
   /** Instagram API (Instagram Login, professional account) long-lived token, for importing posts as products. */
   INSTAGRAM_ACCESS_TOKEN: z.string().optional(),
@@ -69,6 +70,10 @@ if (isProd) {
     console.warn(env.OTP_LOG_CODES === 'true'
       ? 'SETUP MODE: email not configured, sign-in codes are printed to this log. Add BREVO_API_KEY + MAIL_FROM, then remove OTP_LOG_CODES.'
       : 'Email (Brevo) not configured: password sign-in works, but email codes and password resets will not be sent.');
+  // Gemini API keys from Google AI Studio start with "AIza"; other Google tokens (e.g. "AQ.") don't work here.
+  for (const [name, v] of [['GEMINI_API_KEY', env.GEMINI_API_KEY], ['GEMINI_API_KEY_2', env.GEMINI_API_KEY_2]] as const) {
+    if (v && !v.startsWith('AIza')) console.warn(`${name} doesn't look like a Gemini API key (they start with "AIza"). Create one at aistudio.google.com → Get API key.`);
+  }
   if (env.STORAGE_DRIVER === 's3' && !env.S3_PUBLIC_URL) {
     console.error('Set S3_PUBLIC_URL so product photos have public links.');
     process.exit(1);

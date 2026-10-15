@@ -59,6 +59,7 @@ export function createApp() {
   // Webhooks need the raw body: mount before express.json().
   app.post('/v1/payments/razorpay/webhook', ...razorpayWebhook);
 
+  app.use('/v1/assistant', express.json({ limit: '2mb' }));   // Ask Lensio photos
   app.use(express.json({ limit: '1mb' }));
   // Sample frames have text placeholder photos: send drawn frame pictures instead, everywhere.
   app.use('/v1', (req, res, next) => {
@@ -85,8 +86,8 @@ export function createApp() {
         auth: { phoneOtp: whatsappEnabled() || smsEnabled(), otpWhatsApp: whatsappEnabled(), otpSms: smsEnabled(), emailCode: true, password: true },
         loyalty: { enabled: s.loyaltyEnabled, pointsPer100: s.loyaltyPointsPer100, maxRedeemPercent: s.loyaltyMaxRedeemPercent, pointValueRupees: 1 },
         firstOrderCoupon: 'FIRST10',
-        assistantAi: !!env.GEMINI_API_KEY,
-        version: '3.0.1',
+        assistantAi: !!(env.GEMINI_API_KEY || env.GEMINI_API_KEY_2),
+        version: '3.1.1',
       });
     } catch (e) { next(e); }
   });

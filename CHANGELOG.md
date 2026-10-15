@@ -5,6 +5,15 @@ Server versions are shown in `/v1/config` and the admin header. App versions are
 ## Server 2.0.11
 - **Automatic app releases:** Lensio reads the newest GitHub release (tag like v2.0.2, .apk attached, not a pre-release) of the repo in the APK link (or Admin → Settings → GitHub repo). Within 5 minutes the download page, `/download/lensio.apk` and the customers' update window switch to it, with the release notes as “What's new”. No admin step. Admin settings show “Automatic ✓ v2.0.1” or what to fix; manual fields remain as fallback. Optional `GITHUB_TOKEN` env raises GitHub's rate limit.
 
+## Server 3.1.1 · Backup AI key
+- **GEMINI_API_KEY_2** (optional): Ask Lensio uses GEMINI_API_KEY first and switches to the backup automatically when the first key hits its free limit, is rejected or Google has an error. A key that hit its limit rests 10 minutes. If both fail, built-in answers reply. Tested.
+- Startup warning in Render logs if a Gemini key doesn't look like one (AI Studio keys start with “AIza”).
+
+## 3.1.0 · Photo search + precise PD
+- **📷 Photo search in Ask Lensio (“Google Lens” style):** take or choose a photo of glasses (finds the most similar frames as cards), a prescription (reads SPH/CYL/AXIS/ADD/PD, explains it and suggests the right lens) or a face (styles that suit). Photos are shrunk to ~100 KB before sending. Needs the free Gemini key (GEMINI_API_KEY); without it, Lensio explains how to search by typing instead.
+- **💳 Precise PD with a card (try-on):** hold any bank/ID card (85.6 mm, ISO standard) on the forehead, take a photo (spoken 3-2-1) or pick one from the gallery; pupils are found automatically (478-point face mesh), drag two lines onto the card edges (magnifier while dragging) → PD to the nearest 0.5 mm, typically ±1 mm. Saved with the size results.
+- Server accepts up to 2 MB for Ask Lensio only (photos); everything else keeps the 1 MB limit.
+
 ## Server 3.0.1 · Ask Lensio
 - **Fixed “Check the highlighted fields”:** after a long answer, every next question was rejected (the app sends the whole chat back and long replies were over the limit). Long history is now trimmed instead. Tested through the real route.
 - **Built-in knowledge base** (works without an AI key): short, specific answers for cost, lenses for a given power (e.g. −3.5 → Thin 1.60), progressive/bifocal/zero power/blue cut/photochromic/coatings, SPH/CYL/PD, frame size and AI face scan, face shapes, try-on, delivery, UPI payment (COD not available), orders, cancel, returns (WhatsApp), offers, rewards, eye test, eye-care basics, cleaning, contact lenses, sign-in, app download/update, wishlist/compare, stores. Frame finder: “black round frames under 2000 for women”.

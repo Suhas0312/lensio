@@ -117,3 +117,54 @@ describe('built-in answers (no AI key)', () => {
   });
 });
 
+
+describe('photos in Ask Lensio', () => {
+  it('sends the photo to Gemini with the question', async () => {
+    const { env } = await import('../../config/env');
+    (env as { GEMINI_API_KEY?: string }).GEMINI_API_KEY = 'test-key';
+    let body: any;
+    vi.stubGlobal('fetch', async (_u: string, init: any) => { body = JSON.parse(init.body); return { ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: 'Looks like a black round frame. Try Orbit Round.' }] } }] }) }; });
+    const r = await chat([{ role: 'user', text: 'Find frames like this' }], null, { mime: 'image/jpeg', data: 'AAAA' });
+    (env as { GEMINI_API_KEY?: string }).GEMINI_API_KEY = undefined;
+    expect(body.contents[0].parts[0]).toEqual({ inline_data: { mime_type: 'image/jpeg', data: 'AAAA' } });
+    expect(body.systemInstruction.parts[0].text).toContain('PHOTOS');
+    expect(r.products[0].slug).toBe('orbit');
+  });
+  it('explains politely when the AI is not switched on', async () => {
+    const r = await chat([{ role: 'user', text: 'what is this' }], null, { mime: 'image/jpeg', data: 'AAAA' });
+    expect(r.reply).toMatch(/can't look at photos/);
+  });
+});
+
+describe('backup Gemini key', () => {
+  it('switches to GEMINI_API_KEY_2 when the first key hits its limit, and rests the first key', async () => {
+    const { env } = await import('../../config/env');
+    const { _resetGeminiKeys } = await import('./assistant.service');
+    _resetGeminiKeys();
+    const e = env as { GEMINI_API_KEY?: string; GEMINI_API_KEY_2?: string };
+    e.GEMINI_API_KEY = 'key-one'; e.GEMINI_API_KEY_2 = 'key-two';
+    const used: string[] = [];
+    vi.stubGlobal('fetch', async (_u: string, init: any) => {
+      const k = init.headers['x-goog-api-key']; used.push(k);
+      if (k === 'key-one') return { ok: false, status: 429, text: async () => 'quota' };
+      return { ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: 'Answer from the backup key.' }] } }] }) };
+    });
+    const a = await chat([{ role: 'user', text: 'hi' }], null);
+    const b = await chat([{ role: 'user', text: 'hello again' }], null);
+    e.GEMINI_API_KEY = undefined; e.GEMINI_API_KEY_2 = undefined;
+    expect(a).toMatchObject({ mode: 'ai', reply: 'Answer from the backup key.' });
+    expect(b.mode).toBe('ai');
+    expect(used).toEqual(['key-one', 'key-two', 'key-two']);   // the limited key rests on the second question
+  });
+  it('uses built-in answers when both keys fail', async () => {
+    const { env } = await import('../../config/env');
+    const { _resetGeminiKeys } = await import('./assistant.service');
+    _resetGeminiKeys();
+    const e = env as { GEMINI_API_KEY?: string; GEMINI_API_KEY_2?: string };
+    e.GEMINI_API_KEY = 'key-one'; e.GEMINI_API_KEY_2 = 'key-two';
+    vi.stubGlobal('fetch', async () => ({ ok: false, status: 500, text: async () => 'down' }));
+    const r = await chat([{ role: 'user', text: 'Cost' }], null);
+    e.GEMINI_API_KEY = undefined; e.GEMINI_API_KEY_2 = undefined;
+    expect(r.mode).toBe('basic'); expect(r.reply).toMatch(/frame \+ lenses/);
+  });
+});
