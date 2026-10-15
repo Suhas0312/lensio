@@ -11,6 +11,7 @@ import { Logo } from '@/components/Logo';
 import { FollowInstagram } from '@/components/FollowInstagram';
 import { AccountPhone } from '@/components/AccountPhone';
 import { useAppUpdate } from '@/lib/appUpdate';
+import { useFeatures } from '@/lib/features';
 import { colors, space } from '@/theme';
 
 export default function Account() {
@@ -21,6 +22,7 @@ export default function Account() {
     if (Platform.OS !== 'web') return;
     api<{ app?: { latestVersion?: string | null } }>('/config').then((c) => setLatestVersion(c.app?.latestVersion ?? null)).catch(() => {});
   }, []);
+  const features = useFeatures();
   const [name, setName] = useState(user?.name ?? '');
   const [savingName, setSavingName] = useState(false);
   // The page can open before sign-in finishes: show the saved name as soon as the account loads.
@@ -120,7 +122,7 @@ export default function Account() {
       ) : null}
       <Card>
         {[
-          { icon: 'home-outline' as const, t: 'Eye test at home', s: 'Book an optometrist visit', to: '/eye-test' },
+          ...(features.eyeTest ? [{ icon: 'home-outline' as const, t: 'Eye test at home', s: 'Book an optometrist visit', to: '/eye-test' }] : []),
           { icon: 'location-outline' as const, t: 'Find a store', s: 'Try frames in person', to: '/stores' },
         ].map((x) => (
           <Pressable key={x.t} onPress={() => router.push(x.to)} accessibilityRole="button"><Row>

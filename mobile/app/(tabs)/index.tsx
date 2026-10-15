@@ -16,10 +16,12 @@ import { VoiceButton } from '@/components/VoiceButton';
 import { Row, Text } from '@/components/UI';
 import { colors, gradient, radius, space } from '@/theme';
 import { useAppUpdate } from '@/lib/appUpdate';
+import { useFeatures } from '@/lib/features';
 
 const SHAPES = [['RECTANGLE', 'Rectangle'], ['ROUND', 'Round'], ['CAT_EYE', 'Cat-eye'], ['AVIATOR', 'Aviator'], ['WAYFARER', 'Wayfarer'], ['SQUARE', 'Square']];
 
 export default function Home() {
+  const features = useFeatures();
   const { cardW, cols, wide, pad } = useLayout();
   const [bestsellers, setBestsellers] = useState<Product[]>([]);
   const [newest, setNewest] = useState<Product[]>([]);
@@ -125,7 +127,7 @@ export default function Home() {
 
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space(3) }}>
           {[
-            { icon: 'home-outline' as const, t: 'Eye test at home', to: '/eye-test' },
+            ...(features.eyeTest ? [{ icon: 'home-outline' as const, t: 'Eye test at home', to: '/eye-test' }] : []),
             { icon: 'document-text-outline' as const, t: 'Upload prescription', to: '/prescription/new' },
             { icon: 'scan-outline' as const, t: 'Try frames on', to: '/tryon' },
             { icon: 'location-outline' as const, t: 'Find a store', to: '/stores' },
@@ -218,12 +220,13 @@ function ScanHero() {
 
 /** Quick feature tiles (glass style). */
 function FeatureTiles() {
+  const { eyeTest } = useFeatures();
   const tiles: { icon: keyof typeof Ionicons.glyphMap; title: string; sub: string; go: () => void }[] = [
     { icon: 'scan-outline', title: 'Face scan', sub: 'Shape + size', go: () => router.push('/tryon') },
     { icon: 'camera-outline', title: 'Try on', sub: 'Live 3D fit', go: () => router.push('/tryon') },
     { icon: 'git-compare-outline', title: 'Compare', sub: 'Side by side', go: () => router.push('/compare') },
     { icon: 'heart-outline', title: 'Wishlist', sub: 'Saved frames', go: () => router.push('/wishlist') },
-    { icon: 'home-outline', title: 'Eye test', sub: 'At home', go: () => router.push('/eye-test') },
+    ...(eyeTest ? [{ icon: 'home-outline' as const, title: 'Eye test', sub: 'At home', go: () => router.push('/eye-test') }] : []),
   ];
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space(3) }}>

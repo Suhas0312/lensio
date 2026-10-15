@@ -1,4 +1,6 @@
 import { Router } from 'express';
+import { AppError } from '../../lib/errors';
+import { getSettings } from '../settings/settings.service';
 import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
 import { ah } from '../../lib/asyncHandler';
@@ -26,6 +28,7 @@ const createSchema = z.object({
 
 /** Customer requests a home eye-test visit. This creates a lead for the shop to call and schedule — no logistics are automated. */
 r.post('/', validate(createSchema), ah(async (req, res) => {
+  if (!(await getSettings()).eyeTestEnabled) throw new AppError(403, 'EYE_TEST_OFF', 'Eye tests at home are not available right now.');
   const reqRow = await prisma.eyeTestRequest.create({ data: { ...req.body, userId: req.user!.id } });
   const me = await prisma.user.findUnique({ where: { id: req.user!.id }, select: { email: true } });
   void notifyEyeTest({ phone: reqRow.phone, email: me?.email, name: reqRow.fullName, headline: 'Request received',

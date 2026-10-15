@@ -1,9 +1,10 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Alert, View } from 'react-native';
+import { useFeatures } from '@/lib/features';
 import { router, useFocusEffect } from 'expo-router';
 import { api, ApiError } from '@/api/client';
 import { useAuth } from '@/store/auth';
-import { Button, Card, Chip, Field, Row, Screen, Text } from '@/components/UI';
+import { Button, Card, Chip, Empty, Field, Loading, Row, Screen, Text } from '@/components/UI';
 import { colors, space } from '@/theme';
 
 const SLOTS = ['Morning (9am-12pm)', 'Afternoon (12pm-4pm)', 'Evening (4pm-8pm)'] as const;
@@ -11,7 +12,7 @@ interface Req { id: string; preferredDate: string; preferredSlot: string; status
 const STATUS: Record<string, string> = { REQUESTED: 'We\'ll call you to confirm', SCHEDULED: 'Visit booked', COMPLETED: 'Completed', CANCELLED: 'Cancelled' };
 
 /** Book a home eye-test visit. The shop calls to confirm the time. */
-export default function EyeTest() {
+function EyeTestBooking() {
   const user = useAuth((s) => s.user);
   const [f, setF] = useState({ fullName: user?.name ?? '', phone: '', addressLine: '', city: '', pincode: '', notes: '' });
   const [day, setDay] = useState(1);
@@ -72,4 +73,14 @@ export default function EyeTest() {
       <Field label="Anything we should know? (optional)" {...bind('notes')} placeholder="e.g. For 2 people, I wear progressive lenses" />
     </Screen>
   );
+}
+
+/** Shown only when the shop switches on "Eye test at home" in admin → Settings. */
+export default function EyeTest() {
+  const features = useFeatures();
+  if (!features.loaded) return <Loading />;
+  if (!features.eyeTest) {
+    return <Empty title="Eye tests at home aren't available right now" body="You can get your eyes tested at any optician and upload your prescription under Account → Prescriptions." action={<Button title="Upload a prescription" onPress={() => router.push('/prescription/new')} />} />;
+  }
+  return <EyeTestBooking />;
 }

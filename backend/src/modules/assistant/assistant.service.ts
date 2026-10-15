@@ -1,4 +1,5 @@
 import { env } from '../../config/env';
+import { PLACEHOLDER_IMAGE } from '../../lib/frameArt';
 import { prisma } from '../../lib/prisma';
 import { logger } from '../../lib/logger';
 import { getSettings } from '../settings/settings.service';
@@ -13,13 +14,43 @@ export interface ChatReply { reply: string; products: ProductCard[]; handoff: bo
 const rupees = (p: number) => `₹${Math.round(p / 100).toLocaleString('en-IN')}`;
 const day = (d: Date) => d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
 
+/**
+ * Picks the frames worth showing the assistant for this question (shops can have thousands): frames matching
+ * the words asked (name, brand, shape, colour, material, sunglasses/eyeglasses, gender, budget) first, then
+ * the most popular. A photo question gets a mix of sunglasses and eyeglasses, since the photo decides.
+ */
+const PRODUCT_INCLUDE = { variants: { select: { colorName: true, colorHex: true, size: true, stock: true } }, images: { take: 1, orderBy: { sortOrder: 'asc' as const } } };
+async function relevantProducts(question: string, photo: boolean) {
+  const LIMIT = 60;
+  const t = question.toLowerCase();
+  const words = [...new Set(t.split(/[^a-z0-9]+/).filter((w) => w.length >= 3 && !['the', 'and', 'for', 'with', 'like', 'this', 'show', 'frames', 'frame', 'glasses', 'suggest', 'want', 'need', 'some', 'have', 'under', 'below', 'above', 'any', 'which', 'what', 'best'].includes(w)))].slice(0, 8);
+  const sun = /\bsun ?glass|shades|goggles|polari[sz]ed\b/.test(t) ? true : /\b(eyeglass|spectacle|specs|power|prescription|computer)\b/.test(t) ? false : null;
+  const max = Number((t.match(/(?:under|below|less than|within|upto|up to|max)\s*(?:rs\.?|₹|inr)?\s*(\d{3,6})/) || [])[1]) || null;
+  const where = {
+    isActive: true,
+    ...(sun !== null ? { isSunglasses: sun } : {}),
+    ...(max ? { basePrice: { lte: max * 100 } } : {}),
+  };
+  const textMatch = words.length ? await prisma.product.findMany({
+    where: { ...where, OR: words.flatMap((w) => [
+      { name: { contains: w, mode: 'insensitive' as const } }, { brand: { contains: w, mode: 'insensitive' as const } },
+      { description: { contains: w, mode: 'insensitive' as const } }, { variants: { some: { colorName: { contains: w, mode: 'insensitive' as const } } } },
+    ]) },
+    orderBy: { ratingCount: 'desc' }, take: LIMIT, include: PRODUCT_INCLUDE,
+  }) : [];
+  const popular = photo && sun === null
+    ? [...await prisma.product.findMany({ where: { ...where, isSunglasses: true }, orderBy: { ratingCount: 'desc' }, take: 30, include: PRODUCT_INCLUDE }),
+       ...await prisma.product.findMany({ where: { ...where, isSunglasses: false }, orderBy: { ratingCount: 'desc' }, take: 30, include: PRODUCT_INCLUDE })]
+    : await prisma.product.findMany({ where, orderBy: { ratingCount: 'desc' }, take: LIMIT, include: PRODUCT_INCLUDE });
+  const seen = new Set<string>();
+  const idOf = (p: { id?: string; slug: string }) => p.id ?? p.slug;
+  return [...textMatch, ...popular].filter((p) => !seen.has(idOf(p)) && !!seen.add(idOf(p))).slice(0, LIMIT);
+}
+
 /** Everything the assistant is allowed to know, as plain text. Built fresh for every question. */
-async function buildContext(userId: string | null) {
+async function buildContext(userId: string | null, question = '', photo = false) {
   const [products, lenses, coatings, settings, orders] = await Promise.all([
-    prisma.product.findMany({
-      where: { isActive: true }, orderBy: { ratingCount: 'desc' }, take: 60,
-      include: { variants: { select: { colorName: true, size: true, stock: true } }, images: { take: 1, orderBy: { sortOrder: 'asc' } } },
-    }),
+    relevantProducts(question, photo),
     prisma.lensPackage.findMany({ where: { isActive: true }, orderBy: [{ lensType: 'asc' }, { sortOrder: 'asc' }] }),
     prisma.coating.findMany({ where: { isActive: true }, orderBy: { sortOrder: 'asc' } }),
     getSettings(),
@@ -45,7 +76,7 @@ async function buildContext(userId: string | null) {
   }).join('\n') : null;
 
   const shopInfo = [settings.shopInfo, settings.instagramUrl ? `Instagram: ${settings.instagramUrl}` : null].filter(Boolean).join('\n') || null;
-  return { products, lenses, coatings, catalog, lensText, coatText, pay, orderText, shopInfo, signedIn: !!userId };
+  return { products, lenses, coatings, catalog, lensText, coatText, pay, orderText, shopInfo, signedIn: !!userId, eyeTest: settings.eyeTestEnabled };
 }
 
 function systemPrompt(c: Awaited<ReturnType<typeof buildContext>>) {
@@ -55,7 +86,7 @@ How to answer:
 - Answer EVERY question the customer asks: about Lensio, its frames, lenses, prices, orders and app features, and general eyewear and eye-care knowledge (lens types, coatings, materials, frame sizes, face shapes, how to read a prescription, how to care for glasses). If a question is unrelated to eyewear or Lensio, answer briefly and kindly steer back.
 - Be warm, clear and brief: usually 2-5 short sentences, at most about 120 words. Never paste long lists: give the 2-3 most relevant options and offer more. Use plain language. Reply in the customer's language (English, Hindi, Kannada, Tamil, etc.).
 - One-word questions ("cost", "lens", "size") are real questions: answer the most likely meaning.
-- App features you can explain: Try on tab (live camera try-on, AI face scan for face shape, face width, PD and frame size with voice guidance, exact size from the numbers inside your current glasses e.g. 52□18-140, comparison photos, save to gallery), wishlist (♥), compare up to 3 frames (⇄), home eye test booking, stores, Lensio Rewards and gift cards, in-app updates.
+- App features you can explain: Try on tab (live camera try-on, AI face scan for face shape, face width, PD and frame size with voice guidance, exact size from the numbers inside your current glasses e.g. 52□18-140, comparison photos, save to gallery), wishlist (♥), compare up to 3 frames (⇄), stores, Lensio Rewards and gift cards, in-app updates.
 - Only recommend frames from the CATALOG below, using their exact names so the app can show them as cards. Never invent frames, prices, stock, offers or policies. If something isn't listed, say you're not sure and suggest chatting with the team on WhatsApp.
 - Prices are in rupees. Customer pays frame price + lens price + any coatings. Delivery is free above ₹999, otherwise ₹99. First order: code FIRST10 gives 10% off a frame + lens combo (up to ₹750).
 - Prescriptions: you may explain what SPH, CYL, AXIS, ADD and PD mean and which lens type fits (single vision, bifocal, progressive, zero power), and that higher powers need thinner high-index lenses. Never diagnose, never suggest a power, and never give medical advice; for eye problems, pain, sudden vision changes or a new prescription, tell them to see an optometrist or eye doctor. Our optician checks every prescription before lenses are made.
@@ -63,7 +94,8 @@ How to answer:
 - For order questions, use only the CUSTOMER ORDERS section. ${c.signedIn ? '' : 'The customer is not signed in, so you cannot see their orders: ask them to sign in, or to share the order number with the team on WhatsApp.'}
 - For returns, refunds, complaints, damaged items or anything you cannot answer, suggest "Chat with us on WhatsApp" and end your reply with the exact tag [HANDOFF].
 - PHOTOS: the customer may send a photo with their question ("Google Lens"-style).
-  • Glasses or sunglasses (on a face, on a table, a screenshot): describe them in one line (shape, colour, rim, material, style), then recommend the 2-3 MOST SIMILAR frames from the CATALOG by exact name, saying why each is similar. If nothing is close, say so and suggest the nearest style.
+  • Glasses or sunglasses (on a face, on a table, a screenshot): describe them in one line (shape, colour, rim, material, lens tint, style), then recommend the 2-3 MOST SIMILAR items from the CATALOG by exact name, saying why each is similar. Sunglasses photo → recommend items marked "sunglasses"; eyeglasses photo → items marked "eyeglasses" (and mention a sunglasses version if one is similar). If nothing is close, say so and suggest the nearest style.
+  • A face wearing sunglasses or asking for sunglasses: suggest sunglasses from the CATALOG that suit the face shape.
   • A prescription: read the values for each eye (SPH, CYL, AXIS, ADD, PD) as a short, clear list, explain them simply, and suggest the matching lens type and index from LENSES (single vision / progressive / bifocal; higher index for higher power). Say our optician verifies every prescription, and that they can save it under Account → Prescriptions → Add. If anything is unreadable, ask for a clearer photo. Never diagnose.
   • A face: suggest frame shapes that suit the face shape you see and 2-3 frames from the CATALOG, as suggestions. For an exact size and PD, mention the ✨ AI face scan and 💳 card PD tool in the Try on tab.
   • Anything else: say briefly what you see and how you can help with eyewear.
@@ -80,6 +112,8 @@ ${c.coatText || '(none listed)'}
 CATALOG (name | type | shape | material | for | price | size | lens-bridge-temple | colours in stock):
 ${c.catalog || '(no frames listed yet)'}
 
+EYE TEST AT HOME: ${c.eyeTest ? 'available (Account → Eye test at home)' : 'NOT available right now: do not offer it; suggest any local optician and uploading the prescription'}
+
 SHOP INFORMATION FROM THE OWNER:
 ${c.shopInfo || '(not provided; for returns, store address or hours, suggest WhatsApp)'}
 
@@ -87,11 +121,19 @@ CUSTOMER ORDERS:
 ${c.orderText ?? (c.signedIn ? '(no orders yet)' : '(not signed in)')}`;
 }
 
+/** Real photo, or the drawn frame picture when the photo is a text placeholder (same as the shop). */
+function cardImage(p: { id: string; images: { url: string }[]; variants: { colorHex: string | null }[] }) {
+  const url = p.images[0]?.url;
+  if (url && !PLACEHOLDER_IMAGE.test(url)) return url;
+  const hex = (p.variants[0]?.colorHex || '#1B1F3B').replace('#', '');
+  return `${env.PUBLIC_BASE_URL.replace(/\/$/, '')}/v1/catalog/products/${encodeURIComponent(p.id)}/frame.png?c=${hex}&pad=1`;
+}
+
 /** Products the reply mentions by name, shown as tappable cards under the answer. */
 function mentioned(reply: string, products: Awaited<ReturnType<typeof buildContext>>['products']): ProductCard[] {
   const low = reply.toLowerCase();
   return products.filter((p) => low.includes(p.name.toLowerCase())).slice(0, 4)
-    .map((p) => ({ slug: p.slug, name: p.name, price: p.basePrice, mrp: p.mrp, image: p.images[0]?.url ?? null }));
+    .map((p) => ({ slug: p.slug, name: p.name, price: p.basePrice, mrp: p.mrp, image: cardImage(p) }));
 }
 
 /** Gemini keys in order: GEMINI_API_KEY first, GEMINI_API_KEY_2 as the backup. */
@@ -231,7 +273,8 @@ function basicAnswer(q: string, c: Ctx): string {
   const coatMin = c.coatings.length ? rupees(Math.min(...c.coatings.map((x) => x.price))) : null;
 
   // greetings and thanks
-  if (/^\s*(hi|hii+|hello|hey|namaste|namaskara|vanakkam|good (morning|evening|afternoon))\s*$/.test(t)) return 'Hi! I can help you choose frames and lenses, explain your prescription, find your size, and track orders. What are you looking for?';
+  // greetings in many spellings: hi, hii, hlo, helo, hllo, hai, hey, heyy, hy, namaste, namaskara, vanakkam, good morning…
+  if (/^\s*(h+i+|h+e+y+|h+y+|hl+o+|he?l+o+w?|ha?l+o+|hai+|yo|namaste|namaskar[am]?|namaskara|vanakkam|salaam|good (morning|evening|afternoon|night)|(hi|hello|hey) there)( lensio| team| sir| madam)?\s*$/.test(t)) return 'Hi! I can help you choose frames and lenses, explain your prescription, find your size, and track orders. What are you looking for?';
   if (/^\s*(thanks?|thank you|ok(ay)?|great|super|nice|cool)\s*$/.test(t)) return "You're welcome! Anything else I can help with?";
 
   // orders
@@ -293,8 +336,10 @@ function basicAnswer(q: string, c: Ctx): string {
   }
   // contact lenses, eye care
   if (has(/\bcontact lens/)) return "We don't sell contact lenses at the moment, only frames with prescription lenses and sunglasses.";
-  if (has(/\b(eye test|eye check|checkup|optometrist|doctor|home visit)\b/)) return 'Book a free eye test at home: Account → Eye test at home. An optometrist visits, checks your eyes and gives your prescription. For pain, redness or sudden vision changes, please see an eye doctor right away.';
-  if (has(/\b(pain|headache|red eye|itch|blur(red|ry)?|watering|infection)\b/)) return "I can't give medical advice. For eye pain, redness, headaches or blurred vision, please see an optometrist or eye doctor. You can also book an eye test at home in Account.";
+  if (has(/\b(eye test|eye check|checkup|optometrist|doctor|home visit)\b/)) return c.eyeTest
+    ? 'Book a free eye test at home: Account → Eye test at home. An optometrist visits, checks your eyes and gives your prescription. For pain, redness or sudden vision changes, please see an eye doctor right away.'
+    : "Eye tests at home aren't available right now. You can get your eyes tested at any optician and upload the prescription under Account → Prescriptions. For pain, redness or sudden vision changes, please see an eye doctor right away.";
+  if (has(/\b(pain|headache|red eye|itch|blur(red|ry)?|watering|infection)\b/)) return "I can't give medical advice. For eye pain, redness, headaches or blurred vision, please see an optometrist or eye doctor.";
   if (has(/\b(clean|care|scratch proof|maintain)\b/)) return 'Clean lenses with lukewarm water and a drop of mild soap, then dry with a microfibre cloth. Avoid tissues and shirts (they scratch). Store glasses in the case, lenses facing up.';
   // shop info
   if (has(/\b(store|shop|address|location|near me|visit|timing|open|hours)\b/)) return c.shopInfo ? `${c.shopInfo.split('\n').slice(0, 2).join(' ')} You can also see our stores in Account → Find a store.` : 'See our stores in Account → Find a store, or chat with us on WhatsApp for directions. [HANDOFF]';
@@ -326,7 +371,7 @@ function photoFallback(q: string, c: Ctx) {
 }
 
 export async function chat(history: ChatMessage[], userId: string | null, image?: ChatImage): Promise<ChatReply> {
-  const ctx = await buildContext(userId);
+  const ctx = await buildContext(userId, history[history.length - 1]?.text ?? '', !!image);
   const last = history[history.length - 1]?.text ?? '';
   let reply: string; let mode: ChatReply['mode'] = 'basic';
   if (geminiKeys().length) {

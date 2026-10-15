@@ -5,6 +5,26 @@ Server versions are shown in `/v1/config` and the admin header. App versions are
 ## Server 2.0.11
 - **Automatic app releases:** Lensio reads the newest GitHub release (tag like v2.0.2, .apk attached, not a pre-release) of the repo in the APK link (or Admin → Settings → GitHub repo). Within 5 minutes the download page, `/download/lensio.apk` and the customers' update window switch to it, with the release notes as “What's new”. No admin step. Admin settings show “Automatic ✓ v2.0.1” or what to fix; manual fields remain as fallback. Optional `GITHUB_TOKEN` env raises GitHub's rate limit.
 
+## 3.2.0 · Back button everywhere
+- **← Back on every screen:** all screens with a header (product, cart, checkout, wishlist, compare, Ask Lensio, orders, eye test, stores, rewards…), the Shop/Orders/Account tabs and the sign-in screen. Goes to the previous screen, or Home when a page was opened directly from a link. Try-on's ← now works when opened from the tab bar. Tested on 12 screens.
+- **Ask Lensio greetings:** understands “Hlo”, “helo”, “hii”, “hai”, “heyy”, “Namaskara”, “good morning” and similar.
+
+## 3.3.0 · Server + Android app + website
+- **App versions only when you raise them:** the release robot builds a new app only when "version" in mobile/app.json is raised (small fixes don't create versions). Manual run can force one.
+- **No more Render “Application loading” page:** a free GitHub robot visits the server every 10 minutes so it doesn't sleep, and the app shows “Starting try-on…” while the server wakes.
+- Back arrows on Shop, Orders, Account and Try on (app and website). Eye test at home on/off in admin. Try on from the frame page with the chosen colour.
+
+### Bulk catalogue import
+- **Admin → Frames → 📥 Bulk import (CSV):** add or update thousands of frames, lenses and coatings from a spreadsheet. Templates to download; one row per frame colour/size (same name = one frame with several colours); understands everyday words (cat eye, plastic, ladies, ₹1,799) and colour names (tortoise, gunmetal, rose gold…); several photo links per frame; “Check file” lists problems by spreadsheet row and saves nothing; re-importing updates prices/stock with no duplicates. Up to 20,000 rows per file. Tested.
+- **Ask Lensio with large catalogues:** picks the frames relevant to each question or photo (name, brand, shape, colour, material, sunglasses/eyeglasses, budget) instead of only the 60 most popular. Sunglasses photo → suggests sunglasses.
+- **Website: back arrow on the Try on screen** (it was hidden when shown inside the website/app).
+- Admin header shows the real server version (was a fixed “v2.0”).
+
+## 3.2.0
+- **Eye test at home: on/off in admin → Settings** (off by default). While off it is hidden on Home, Account and in Ask Lensio, the page shows a friendly message, and bookings are refused by the server.
+- **Try on from the frame page:** a prominent “👓 Try it on your face” button under the price opens the try-on with that frame and the chosen colour already on your face.
+- Ask Lensio: frame cards show the drawn frame pictures (not name text); short greetings like “Hlo”, “helo”, “hii”, “hai” are understood.
+
 ## Server 3.1.3 · Current Gemini model
 - **Ask Lensio AI works again with current keys:** Google retires gemini-2.5-flash on 16 Oct 2026 and new keys can't use it (“model not available”). Lensio now uses **gemini-flash-latest** (always Google's current Flash) and, if a model is retired, automatically tries gemini-3.5-flash and gemini-3.1-flash-lite. The working model is remembered and shown in “Test AI keys”.
 - Removed the “should start with AIza” warning: newer Google keys can look different (e.g. “AQ.”); the live test is what counts.

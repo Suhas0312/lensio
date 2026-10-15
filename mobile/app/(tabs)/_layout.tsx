@@ -1,9 +1,12 @@
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, font } from '@/theme';
+import { BackButton } from '@/components/BackButton';
 
 type Icon = keyof typeof Ionicons.glyphMap;
 const tab = (icon: Icon) => ({ tabBarIcon: ({ color, size }: { color: string; size: number }) => <Ionicons name={icon} color={color} size={size} /> });
+
+const back = ({ tintColor }: { tintColor?: string }) => <BackButton tint={tintColor} toHome />;
 
 export default function TabsLayout() {
   return (
@@ -15,10 +18,10 @@ export default function TabsLayout() {
       tabBarLabelStyle: { fontFamily: font.semibold, fontSize: 11 },
     }}>
       <Tabs.Screen name="index" options={{ title: 'Home', headerShown: false, ...tab('home-outline') }} />
-      <Tabs.Screen name="shop" options={{ title: 'Shop', ...tab('glasses-outline') }} />
+      <Tabs.Screen name="shop" options={{ title: 'Shop', headerLeft: back, ...tab('glasses-outline') }} />
       <Tabs.Screen name="tryon" options={{ title: 'Try on', headerShown: false, ...tab('scan-outline') }} />
-      <Tabs.Screen name="orders" options={{ title: 'Orders', ...tab('cube-outline') }} />
-      <Tabs.Screen name="account" options={{ title: 'Account', ...tab('person-outline') }} />
+      <Tabs.Screen name="orders" options={{ title: 'Orders', headerLeft: back, ...tab('cube-outline') }} />
+      <Tabs.Screen name="account" options={{ title: 'Account', headerLeft: back, ...tab('person-outline') }} />
     </Tabs>
   );
 }

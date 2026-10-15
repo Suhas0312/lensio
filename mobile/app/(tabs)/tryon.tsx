@@ -15,14 +15,14 @@ import { colors, space } from '@/theme';
 const ORIGIN = API_URL.startsWith('http') ? API_URL.replace(/\/v1\/?$/, '') : '';
 
 export default function TryOn() {
-  const { frame } = useLocalSearchParams<{ frame?: string }>();
-  const src = `${ORIGIN}/try-on/?embed=1${frame ? `&frame=${encodeURIComponent(frame)}` : ''}`;
+  const { frame, color } = useLocalSearchParams<{ frame?: string; color?: string }>();
+  const src = `${ORIGIN}/try-on/?embed=1${frame ? `&frame=${encodeURIComponent(frame)}` : ''}${color ? `&color=${encodeURIComponent(color)}` : ''}`;
   return Platform.OS === 'web' ? <WebTryOn src={src} /> : <NativeTryOn src={src} />;
 }
 
 function onPageMessage(m: { type?: string; slug?: string; size?: string }) {
   if (m.type === 'open' && m.slug) router.push({ pathname: '/product/[slug]', params: { slug: m.slug, ...(m.size ? { size: m.size } : {}) } });
-  if (m.type === 'close') router.back();
+  if (m.type === 'close') { if (router.canGoBack()) router.back(); else router.navigate('/(tabs)'); }   // ← always works
 }
 
 function WebTryOn({ src }: { src: string }) {
@@ -41,12 +41,48 @@ function WebTryOn({ src }: { src: string }) {
   );
 }
 
+/**
+ * The free Render server sleeps after 15 minutes without visitors; opening the try-on page then shows
+ * Render's "Application loading" screen. Ask /health first (up to ~60 s) and show our own message meanwhile.
+ */
+function useServerAwake() {
+  const [state, setState] = useState<'checking' | 'ready' | 'failed'>('checking');
+  useEffect(() => {
+    let stop = false;
+    (async () => {
+      const until = Date.now() + 75_000;
+      while (!stop && Date.now() < until) {
+        try {
+          const r = await fetch(`${ORIGIN}/health`, { headers: { Accept: 'application/json' } });
+          if (r.ok && (r.headers.get('content-type') || '').includes('json')) { setState('ready'); return; }
+        } catch { /* still waking */ }
+        await new Promise((res) => setTimeout(res, 2500));
+      }
+      if (!stop) setState('failed');
+    })();
+    return () => { stop = true; };
+  }, []);
+  return state;
+}
+
+function Waking({ failed }: { failed: boolean }) {
+  return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.night, padding: space(6), justifyContent: 'center', alignItems: 'center', gap: space(4) }}>
+      <Logo variant="mark" height={72} />
+      <Text v="heading" style={{ textAlign: 'center' }}>{failed ? "Try-on couldn't start" : 'Starting try-on…'}</Text>
+      <Text color={colors.muted} style={{ textAlign: 'center' }}>{failed ? 'Check your internet connection and open the Try on tab again.' : 'Getting the frames ready. This can take a few seconds the first time.'}</Text>
+      {failed ? null : <Loading />}
+    </SafeAreaView>
+  );
+}
+
 function NativeTryOn({ src }: { src: string }) {
   const webRef = useRef<any>(null);
   // Required here (not at the top) so the web build never loads the native camera module.
   const { useCameraPermissions } = require('expo-camera') as typeof import('expo-camera');
   const [perm, requestPerm] = useCameraPermissions();
   const [visible, setVisible] = useState(true);
+  const awake = useServerAwake();
   // Stop the camera when leaving the tab (the WebView unmounts).
   useFocusEffect(useCallback(() => { setVisible(true); return () => setVisible(false); }, []));
 
@@ -62,6 +98,7 @@ function NativeTryOn({ src }: { src: string }) {
     );
   }
   if (!visible) return <View style={{ flex: 1, backgroundColor: colors.night }} />;
+  if (awake !== 'ready') return <Waking failed={awake === 'failed'} />;
 
   // Loaded lazily so the web build never touches the native module.
   const { WebView } = require('react-native-webview') as typeof import('react-native-webview');

@@ -2,8 +2,10 @@
 
 After this one-time setup you never build or publish the app by hand again.
 
-**You:** change anything in `mobile/` and upload it to GitHub.
-**GitHub (automatically):** next version number → APK built on Expo → GitHub release with `lensio.apk`.
+**You:** when you want a new app version, raise `"version"` in `mobile/app.json` (e.g. 3.3.0 → 3.4.0) and upload it.
+**GitHub (automatically):** APK built on Expo → GitHub release with `lensio.apk`.
+
+Uploads that don't raise the version are just saved: no new app version is published (small fixes can wait for the next release).
 **Lensio server (automatically, within ~5 minutes):** `/download`, `/download/lensio.apk` and the in-app
 "Update available" window switch to the new version. No admin step.
 
@@ -30,8 +32,14 @@ Actions tab → **Android app release** → **Run workflow** → optionally type
 
 ## Version numbers
 
-Automatic: the patch number goes up each release (2.0.2 → 2.0.3). For a bigger jump, set `"version"` in
-`mobile/app.json` yourself (e.g. `3.0.0`); that version is used.
+You decide: a release happens only when `"version"` in `mobile/app.json` is higher than the newest release.
+Use 3.4.0 for a feature release, 3.3.1 for a fix release. To publish without changing the file, use
+Actions → Android app release → Run workflow → tick “Release even if…” (uses the next patch number).
+
+## Keeping the server awake
+
+`.github/workflows/keep-awake.yml` visits the server every 10 minutes so Render's free plan doesn't put it
+to sleep (customers would otherwise see Render's “Application loading” page). Nothing to set up.
 
 ## What's new text
 

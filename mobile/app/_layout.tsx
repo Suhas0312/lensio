@@ -10,6 +10,7 @@ import { useFonts, Quicksand_500Medium, Quicksand_600SemiBold, Quicksand_700Bold
 import { useAuth } from '@/store/auth';
 import { UpdatePrompt } from '@/components/UpdatePrompt';
 import { OfflineBanner } from '@/components/OfflineBanner';
+import { BackButton } from '@/components/BackButton';
 import { colors, font } from '@/theme';
 
 SplashScreen.preventAutoHideAsync();
@@ -38,6 +39,7 @@ export default function RootLayout() {
         headerStyle: { backgroundColor: colors.night }, headerTintColor: colors.text, headerShadowVisible: false,
         headerTitleStyle: { fontFamily: font.bold }, contentStyle: { backgroundColor: colors.night }, headerBackTitleVisible: false,
         animation: 'slide_from_right', animationDuration: 260, gestureEnabled: true,
+        headerLeft: ({ tintColor }) => <BackButton tint={tintColor} />,   // always visible, even on a direct link
       }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="(auth)/login" options={{ headerShown: false, presentation: 'modal', animation: 'slide_from_bottom' }} />

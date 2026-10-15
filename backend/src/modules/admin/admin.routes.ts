@@ -13,6 +13,7 @@ import { orderInclude, transition } from '../orders/orders.service';
 import { STATUS_LABEL } from '../notifications/whatsapp.service';
 import { androidRelease } from '../settings/appRelease';
 import { testGeminiKeys } from '../assistant/assistant.service';
+import { importCatalog, Kind, TEMPLATES } from '../catalogImport/import.service';
 import { getSettings, saveSettings } from '../settings/settings.service';
 import { sendMail } from '../../lib/mail';
 import { notifyEyeTest, notifyOrderUpdate } from '../notifications/whatsapp.service';
@@ -366,6 +367,18 @@ r.post('/coupons', adminOnly, validate(z.object({
 r.get('/settings', ah(async (_req, res) => { res.json(await getSettings()); }));
 /** Settings → "Test AI keys" for Ask Lensio. */
 r.post('/assistant/test', ah(async (_req, res) => { res.json({ keys: await testGeminiKeys() }); }));
+
+/** Frames → Bulk import: thousands of frames / lenses / coatings from a CSV. dryRun = "Check file" only. */
+r.get('/import/template/:kind', adminOnly, ah(async (req, res) => {
+  const kind = req.params.kind as Kind;
+  if (!TEMPLATES[kind]) throw badRequest('BAD_KIND', 'Choose frames, lenses or coatings');
+  res.set({ 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="lensio-${kind}-template.csv"` }).send('\uFEFF' + TEMPLATES[kind]);
+}));
+r.post('/import/:kind', adminOnly, validate(z.object({ csv: z.string().min(1).max(15_000_000), dryRun: z.boolean().default(true) })), ah(async (req, res) => {
+  const kind = req.params.kind as Kind;
+  if (!TEMPLATES[kind]) throw badRequest('BAD_KIND', 'Choose frames, lenses or coatings');
+  res.json(await importCatalog(kind, req.body.csv, req.body.dryRun));
+}));
 /** What customers get right now: the automatic GitHub release (or the admin fallback), for the settings page. */
 r.get('/app-release', adminOnly, ah(async (_req, res) => { res.json(await androidRelease()); }));
 
@@ -378,7 +391,7 @@ r.put('/settings', adminOnly, validate(z.object({
   shopInfo: z.string().max(4000).nullable().optional(),
   instagramUrl: z.string().trim().url('Paste your full Instagram link').nullable().optional().or(z.literal('').transform(() => null)),
   ownerEmailAlerts: z.boolean().optional(), autoStartLensWork: z.boolean().optional(),
-  autoApproveTypedRx: z.boolean().optional(), frameOnlyToQc: z.boolean().optional(),
+  autoApproveTypedRx: z.boolean().optional(), frameOnlyToQc: z.boolean().optional(), eyeTestEnabled: z.boolean().optional(),
   androidLatestVersion: z.string().trim().regex(/^\d+\.\d+\.\d+$/, 'Version looks like 1.0.1').nullable().optional().or(z.literal('').transform(() => null)),
   androidMinVersion: z.string().trim().regex(/^\d+\.\d+\.\d+$/, 'Minimum version looks like 1.0.1').nullable().optional().or(z.literal('').transform(() => null)),
   androidUpdateNotes: z.string().trim().max(600).nullable().optional().or(z.literal('').transform(() => null)),

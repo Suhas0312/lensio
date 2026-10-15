@@ -178,6 +178,12 @@
     renderStrip();
     const pick = S.frames.find((f) => f.slug === qs.get('frame')) || S.frames[0];
     await select(pick.id);
+    // Opened from a product page with a colour: show that colour on the face straight away.
+    const want = (qs.get('color') || '').replace('#', '').toLowerCase();
+    if (want && pick.slug === qs.get('frame')) {
+      const c = colorsOf(pick).find((x) => x.hex.replace('#', '').toLowerCase() === want);
+      if (c && c.hex !== S.color) { S.color = c.hex; try { await showOverlay(); } catch { /* keep the default colour */ } }
+    }
   }
   function orderedFrames() {
     const sized = S.frames.filter((f) => hasSize(f, S.sizeFilter));
@@ -867,7 +873,7 @@
     if (EMBED) post({ type: 'open', slug: S.sel.slug, size }); else location.href = `/product/${S.sel.slug}${size ? `?size=${size}` : ''}`;
   });
   $('#back').addEventListener('click', () => { if (EMBED) post({ type: 'close' }); else if (history.length > 1) history.back(); else location.href = '/'; });
-  if (EMBED) $('#back').hidden = true;  // the app has its own navigation
+  // ← stays visible inside the app and website too: the Try on screen has no other back button.
   // Phones resize the page constantly (address bar, rotation): re-map the last detected face to the new size.
   window.addEventListener('resize', () => {
     const raw = S.raw; S.face = null; S.manual = null;

@@ -47,6 +47,8 @@ export default function ProductScreen() {
 
   if (!p) return <Loading />;
   const price = p.basePrice + (variant?.priceDelta ?? 0);
+  /** Opens the try-on with this frame and the colour the customer picked. */
+  const tryOn = () => router.push({ pathname: '/tryon', params: { frame: p.slug, ...(color ? { color: color.replace('#', '') } : {}) } });
 
   const buy = (withLens: boolean) => {
     if (!variant) return;
@@ -89,6 +91,15 @@ export default function ProductScreen() {
           <Text v="caption" color={colors.muted}>frame price, lenses from ₹0</Text>
         </Row>
         {p.ratingCount ? <Text v="caption" color={colors.muted}>{p.rating.toFixed(1)} ★ from {p.ratingCount} reviews</Text> : null}
+        <Pressable onPress={tryOn} accessibilityRole="button" accessibilityLabel={`Try on ${p.name}`}
+          style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', gap: space(3), marginTop: space(2), padding: space(3), borderRadius: radius.md, borderWidth: 1, borderColor: colors.cyan, backgroundColor: 'rgba(34,211,238,0.08)', transform: [{ scale: pressed ? 0.98 : 1 }] })}>
+          <Ionicons name="scan-outline" size={26} color={colors.cyan} />
+          <View style={{ flex: 1 }}>
+            <Text v="bodyStrong">👓 Try it on your face</Text>
+            <Text v="caption" color={colors.muted}>See this frame{colorsList.find((c) => c.colorHex === color)?.colorName ? ` in ${colorsList.find((c) => c.colorHex === color)?.colorName}` : ''} live with your camera, and check your size</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={colors.cyan} />
+        </Pressable>
       </View>
 
       <View style={{ gap: space(2) }}>
@@ -125,7 +136,7 @@ export default function ProductScreen() {
         <Text v="caption" color={colors.faint}>Compare with your current glasses: the numbers on the inside of the arm read lens–bridge–temple, like {p.lensWidthMm}-{p.bridgeMm}-{p.templeMm}.</Text>
       </Card>
 
-      <Button kind="secondary" title="👓 Try this frame on" onPress={() => router.push({ pathname: '/tryon', params: { frame: p.slug } })} />
+      <Button kind="secondary" title="👓 Try this frame on" onPress={tryOn} />
       <Button kind="ghost" title="💬 Ask about this frame" onPress={() => router.push({ pathname: '/assistant', params: { ask: `Tell me about the ${p.name}: who it suits, and which lenses you'd pair with it.` } })} />
 
       <View style={{ gap: space(2) }}>

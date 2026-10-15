@@ -60,6 +60,7 @@ export function createApp() {
   app.post('/v1/payments/razorpay/webhook', ...razorpayWebhook);
 
   app.use('/v1/assistant', express.json({ limit: '2mb' }));   // Ask Lensio photos
+  app.use('/v1/admin/import', express.json({ limit: '16mb' }));   // bulk catalogue CSVs (thousands of rows)
   app.use(express.json({ limit: '1mb' }));
   // Sample frames have text placeholder photos: send drawn frame pictures instead, everywhere.
   app.use('/v1', (req, res, next) => {
@@ -81,13 +82,14 @@ export function createApp() {
         supportWhatsApp: env.SUPPORT_WHATSAPP_NUMBER,
         razorpayKeyId: env.RAZORPAY_KEY_ID ?? null,
         payments: { razorpay: !!(env.RAZORPAY_KEY_ID && env.RAZORPAY_KEY_SECRET), upiManual: upiManualAvailable(s), cod: s.codEnabled },
+        features: { eyeTest: s.eyeTestEnabled },
         app: { androidApkUrl: rel.apkUrl, latestVersion: rel.version, minVersion: rel.minVersion, notes: rel.notes },
         instagramUrl: s.instagramUrl,
         auth: { phoneOtp: whatsappEnabled() || smsEnabled(), otpWhatsApp: whatsappEnabled(), otpSms: smsEnabled(), emailCode: true, password: true },
         loyalty: { enabled: s.loyaltyEnabled, pointsPer100: s.loyaltyPointsPer100, maxRedeemPercent: s.loyaltyMaxRedeemPercent, pointValueRupees: 1 },
         firstOrderCoupon: 'FIRST10',
         assistantAi: !!(env.GEMINI_API_KEY || env.GEMINI_API_KEY_2),
-        version: '3.1.3',
+        version: '3.3.0',
       });
     } catch (e) { next(e); }
   });

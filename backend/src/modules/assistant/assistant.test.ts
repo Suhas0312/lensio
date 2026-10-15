@@ -211,3 +211,21 @@ describe('retired Gemini models', () => {
     expect(urls).toEqual(['gemini-2.5-flash', 'gemini-flash-latest', 'gemini-flash-latest']);
   });
 });
+
+describe('greetings', () => {
+  it('understands everyday spellings', async () => {
+    for (const g of ['Hlo', 'helo', 'hii', 'Hai', 'heyy', 'hy', 'hello lensio', 'Namaskara', 'good morning']) {
+      expect((await chat([{ role: 'user', text: g }], null)).reply, g).toMatch(/^Hi! I can help/);
+    }
+  });
+});
+
+describe('eye test switch', () => {
+  it('does not offer eye tests at home while the shop has them switched off', async () => {
+    const r = await chat([{ role: 'user', text: 'book eye test at home' }], null);
+    expect(r.reply).toMatch(/aren't available right now/);
+  });
+  it('understands short greetings like "Hlo"', async () => {
+    for (const g of ['Hlo', 'helo', 'hii', 'hai', 'hey there']) expect((await chat([{ role: 'user', text: g }], null)).reply).toMatch(/^Hi!/);
+  });
+});

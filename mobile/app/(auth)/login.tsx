@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { api, ApiError } from '@/api/client';
 import { useAuth } from '@/store/auth';
 import { Button, Chip, Field, Row, Text } from '@/components/UI';
+import { BackButton } from '@/components/BackButton';
 import { Logo } from '@/components/Logo';
 import { colors, space } from '@/theme';
 import { webColumn } from '@/lib/layout';
@@ -88,6 +89,7 @@ export default function Login() {
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, backgroundColor: colors.night }}>
+      <View style={{ position: 'absolute', top: Platform.OS === 'web' ? 12 : 44, left: 8, zIndex: 10 }}><BackButton /></View>
       <ScrollView contentContainerStyle={[{ padding: space(6), gap: space(6), flexGrow: 1, justifyContent: 'center' }, webColumn(440)]} keyboardShouldPersistTaps="handled">
         <View style={{ alignItems: 'center' }}><Logo variant="lockup" height={150} /></View>
 

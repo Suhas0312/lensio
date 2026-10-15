@@ -57,7 +57,7 @@
     const tabs = [['products', 'Frames'], ['pricing', 'Lens prices'], ['orders', 'Orders'], ['rx', 'Prescriptions'], ['reviews', 'Reviews'], ['rewards', 'Rewards'], ['stores', 'Stores'], ['eyetest', 'Eye tests'], ['settings', 'Settings']];
     return `<header><img src="wordmark.png" alt="Lensio"><nav>${tabs.map(([k, l]) => `<button data-act="nav" data-v="${k}" class="${S.view === k ? 'on' : ''}">${l}</button>`).join('')}</nav>
       <button class="link" data-act="alertsOpen" style="color:#fff;font-size:15px" aria-label="Alerts">🔔${S.alerts.unseen ? ` <span class="pill bad" style="background:#FF5C7A;color:#fff">${S.alerts.unseen}</span>` : ''}</button>
-      <span class="who">${esc(S.user.email || (S.user.phone ? '+91 ' + S.user.phone : ''))} · ${tc(S.user.role)} · v2.0</span><button class="link" style="color:#A3A8D2" data-act="logout">Sign out</button></header><main>${inner}</main>`;
+      <span class="who">${esc(S.user.email || (S.user.phone ? '+91 ' + S.user.phone : ''))} · ${tc(S.user.role)}${S.serverVersion ? ' · v' + esc(S.serverVersion) : ''}</span><button class="link" style="color:#A3A8D2" data-act="logout">Sign out</button></header><main>${inner}</main>`;
   }
 
   function loginView() {
@@ -95,7 +95,7 @@
         <td><span class="pill ${stock === 0 ? 'bad' : stock <= 5 ? 'warn' : 'ok'}">${stock} in stock</span></td>
         <td><span class="pill ${p.isActive ? 'ok' : ''}">${p.isActive ? 'Live' : 'Hidden'}</span>${p.images.length ? '' : ' <span class="pill warn">No photos</span>'}</td></tr>`;
     }).join('');
-    return shell(`<div class="bar"><h1 class="grow">Frames</h1><input id="psearch" placeholder="Search name or SKU" style="max-width:260px" value="${esc(S.data.q || '')}"><button class="btn" data-act="igOpen">📸 Import from Instagram</button><button class="btn" data-act="quickAdd">⚡ Quick add from photos</button><button class="btn p" data-act="newProduct">Add frame</button></div>
+    return shell(`<div class="bar"><h1 class="grow">Frames</h1><input id="psearch" placeholder="Search name or SKU" style="max-width:260px" value="${esc(S.data.q || '')}"><button class="btn" data-act="nav" data-v="import">📥 Bulk import (CSV)</button><button class="btn" data-act="igOpen">📸 Import from Instagram</button><button class="btn" data-act="quickAdd">⚡ Quick add from photos</button><button class="btn p" data-act="newProduct">Add frame</button></div>
       <div class="card">${list.length ? `<div class="tablewrap"><table><thead><tr><th></th><th>Frame</th><th>Price</th><th>Colours</th><th>Stock</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div>`
         : `<p>No frames yet. Add frames one at a time, or pick many photos at once with Quick add.</p><div style="display:flex;gap:8px"><button class="btn" data-act="quickAdd">⚡ Quick add from photos</button><button class="btn p" data-act="newProduct">Add frame</button></div>`}</div>
       <input type="file" id="quickInput" accept="image/jpeg,image/png,image/webp" multiple hidden>`);
@@ -596,6 +596,7 @@
         <label class="check"><input type="checkbox" id="setAlerts" ${s.ownerEmailAlerts ? 'checked' : ''}> <span><b>Email me</b> about new orders, UPI payments to check, prescriptions to review, cancellations and courier problems (sent to every address in ADMIN_EMAILS)</span></label>
         <label class="check"><input type="checkbox" id="setAutoLens" ${s.autoStartLensWork ? 'checked' : ''}> <span>When a prescription is verified, <b>start lens cutting & fitting</b> automatically</span></label>
         <label class="check"><input type="checkbox" id="setFrameQc" ${s.frameOnlyToQc ? 'checked' : ''}> <span><b>Frame-only orders</b> skip the lens steps and go straight to quality check</span></label>
+        <label class="check"><input type="checkbox" id="setEyeTest" ${s.eyeTestEnabled ? 'checked' : ''}> <span><b>Eye test at home</b>: show the booking option to customers (Home, Account, Ask Lensio). Leave off until you have an optometrist ready; bookings are refused while it's off.</span></label>
         <label class="check"><input type="checkbox" id="setAutoRx" ${s.autoApproveTypedRx ? 'checked' : ''}> <span><b>Auto-approve typed prescriptions</b> that pass every check and aren't high power. Uploaded photos and high powers are always reviewed by a person. Leave this off if your optician should check every prescription.</span></label>
         <p class="muted small" style="margin:0">Courier steps (picked up, in transit, out for delivery, delivered) are automatic once Shiprocket is connected. Until then, add them under an order's <b>Courier & live tracking</b>.</p>
         <div><button class="btn" data-act="enableNotif">${'Notification' in window && Notification.permission === 'granted' ? '✓ Desktop pop-ups are on' : '🔔 Turn on desktop pop-ups'}</button></div></div>
@@ -626,15 +627,48 @@
   }
 
   // ---------------- Render + data ----------------
+  /** Frames → Bulk import: thousands of frames, lenses or coatings from a spreadsheet (CSV). */
+  function importView() {
+    const im = S.imp || (S.imp = { kind: 'frames', file: null, csv: null, result: null, busy: false });
+    const r = im.result, label = { frames: 'frames', lenses: 'lenses', coatings: 'coatings' }[im.kind];
+    const help = {
+      frames: 'One row per colour/size of a frame. Rows with the same <b>name</b> (and brand) become one frame with several colours. Required: name, shape, price, lens_width, bridge, temple. Optional: brand, type (eyeglasses/sunglasses), material, gender, mrp, frame_width, weight, colour, colour_hex, size, stock, sku, image_url (several links separated by |), description, active.',
+      lenses: 'One row per lens option. Required: name, type (single vision, reading, bifocal, progressive, zero power), index (1.50–1.74), price (0 = included), max_sph (highest power it supports). Optional: max_cyl, description, active.',
+      coatings: 'One row per coating. Required: name, price. Optional: description, active.',
+    }[im.kind];
+    return shell(`<div class="bar"><button class="link" data-act="nav" data-v="products">← Frames</button><h1 class="grow">Bulk import</h1></div>
+      <div class="card">
+        <div style="display:flex;gap:8px;flex-wrap:wrap">${['frames', 'lenses', 'coatings'].map((k) => `<button class="btn ${im.kind === k ? 'p' : ''}" data-act="impKind" data-k="${k}">${k[0].toUpperCase() + k.slice(1)}</button>`).join('')}</div>
+        <p class="small" style="margin-top:10px">${help}</p>
+        <p class="small"><b>1.</b> <button class="link" data-act="impTemplate">Download the ${label} template</button>, open it in Excel or Google Sheets and fill in your ${label} (thousands of rows are fine).
+        <br><b>2.</b> Save as <b>CSV</b> (Excel: File → Save As → “CSV UTF-8”; Google Sheets: File → Download → CSV).
+        <br><b>3.</b> Choose the file, tap <b>Check file</b>, fix any rows it lists, then <b>Import</b>. Importing the same file again updates prices and stock (no duplicates).</p>
+        <input type="file" id="impFile" accept=".csv,text/csv" style="margin:8px 0">
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn" data-act="impCheck" ${im.csv && !im.busy ? '' : 'disabled'}>Check file</button>
+          <button class="btn p" data-act="impRun" ${im.csv && r && r.dryRun && !im.busy ? '' : 'disabled'}>Import ${r && r.dryRun ? (r.created + r.updated) + ' ' + label : ''}</button>
+        </div>
+        ${im.file ? `<p class="small muted">File: ${esc(im.file)}</p>` : ''}
+        ${im.busy ? '<p class="small">Working… large files can take a minute.</p>' : ''}
+      </div>
+      ${r ? `<div class="card"><h2>${r.dryRun ? 'Check result (nothing saved yet)' : 'Imported ✓'}</h2>
+        <p>${r.rows} rows · <b>${r.created}</b> new ${label} · <b>${r.updated}</b> updated · ${r.skipped} rows skipped</p>
+        ${r.errors.length ? `<p class="small"><b>Rows to fix</b> (row numbers match your spreadsheet):</p><div style="max-height:320px;overflow:auto"><table class="small"><tr><th>Row</th><th>Problem</th></tr>${r.errors.map((e) => `<tr><td>${e.row}</td><td>${esc(e.message)}</td></tr>`).join('')}</table></div>` : '<p class="small">No problems found.</p>'}
+        ${!r.dryRun ? `<p class="small"><button class="link" data-act="nav" data-v="products">See your frames →</button></p>` : ''}</div>` : ''}`);
+  }
+
   function render() {
     const app = $('#app');
     if (!S.token || !S.user) { app.innerHTML = loginView(); return; }
     const v = S.view;
     app.innerHTML = v === 'products' ? productsView() : v === 'edit' ? editorView() : v === 'pricing' ? pricingView()
-      : v === 'orders' ? ordersView() : v === 'order' ? orderView() : v === 'settings' ? settingsView() : v === 'quick' ? quickView() : v === 'alerts' ? alertsView() : v === 'reviews' ? reviewsView() : v === 'rewards' ? rewardsView() : v === 'stores' ? storesView() : v === 'eyetest' ? eyeTestView() : v === 'ig' ? igView() : rxView();
+      : v === 'orders' ? ordersView() : v === 'order' ? orderView() : v === 'settings' ? settingsView() : v === 'quick' ? quickView() : v === 'alerts' ? alertsView() : v === 'reviews' ? reviewsView() : v === 'rewards' ? rewardsView() : v === 'stores' ? storesView() : v === 'eyetest' ? eyeTestView() : v === 'ig' ? igView() : v === 'import' ? importView() : rxView();
     if (v === 'settings') drawTestQr();
     if (v === 'edit') wireDrop();
   }
+
+  // Real server version for the header (was a fixed "v2.0")
+  fetch(API + '/config').then((r) => r.json()).then((c) => { if (c && c.version) { S.serverVersion = c.version; if (S.user) render(); } }).catch(() => {});
 
   async function load(view) {
     S.view = view; render();
@@ -809,6 +843,17 @@
       }
       if (act === 'pickQr') return $('#qrInput').click();
       if (act === 'qrDel') { S.data.settings = await api('/admin/settings', { method: 'PUT', body: { upiQrImage: null } }); toast('QR image removed'); return render(); }
+      if (act === 'impKind') { S.imp = { kind: el.dataset.k, file: null, csv: null, result: null, busy: false }; return render(); }
+      if (act === 'impTemplate') {
+        const kind = S.imp.kind, r = await fetch(API + '/admin/import/template/' + kind, { headers: { Authorization: 'Bearer ' + S.token } });
+        const a = document.createElement('a'); a.href = URL.createObjectURL(await r.blob()); a.download = `lensio-${kind}-template.csv`; a.click(); return;
+      }
+      if (act === 'impCheck' || act === 'impRun') {
+        S.imp.busy = true; render();
+        try { S.imp.result = await api('/admin/import/' + S.imp.kind, { body: { csv: S.imp.csv, dryRun: act === 'impCheck' } }); if (act === 'impRun') { S.data.products = null; toast('Import finished'); } }
+        catch (e) { toast(e.message); }
+        S.imp.busy = false; return render();
+      }
       if (act === 'testAi') {
         el.disabled = true; $('#aiTest').textContent = 'Testing with Google…';
         try {
@@ -826,7 +871,7 @@
             androidApkUrl: $('#setApk').value.trim() || null, androidLatestVersion: $('#setVer').value.trim() || null, androidMinVersion: $('#setMinVer').value.trim() || null, androidReleaseRepo: $('#setRepo').value.trim().replace(/^https?:\/\/github\.com\//i, '').replace(/\/+$/, '') || null, androidUpdateNotes: $('#setNotes').value.trim() || null, shopInfo: $('#setInfo').value.trim() || null,
             instagramUrl: ($('#setInsta').value.trim().split('?')[0]) || null,
             ownerEmailAlerts: $('#setAlerts').checked, autoStartLensWork: $('#setAutoLens').checked,
-            frameOnlyToQc: $('#setFrameQc').checked, autoApproveTypedRx: $('#setAutoRx').checked,
+            frameOnlyToQc: $('#setFrameQc').checked, autoApproveTypedRx: $('#setAutoRx').checked, eyeTestEnabled: $('#setEyeTest').checked,
             loyaltyEnabled: $('#setLoyal').checked, loyaltyPointsPer100: Math.max(0, parseInt($('#setPts').value, 10) || 0),
             loyaltyMaxRedeemPercent: Math.min(100, Math.max(0, parseInt($('#setPtsMax').value, 10) || 0)), reviewsAutoApprove: $('#setRevAuto').checked } });
           S.data.release = await api('/admin/app-release').catch(() => null); toast('Settings saved'); return render();
@@ -964,6 +1009,11 @@
     const t = e.target;
     try {
       if (t.dataset.gc) { await api(`/admin/giftcards/${t.dataset.gc}`, { method: 'PATCH', body: { isActive: t.checked } }); toast(t.checked ? 'Gift card active' : 'Gift card turned off'); }
+      if (t.id === 'impFile') {
+        const f = t.files[0]; if (!f) return;
+        if (f.size > 15_000_000) { toast('That file is over 15 MB: split it into smaller files.'); return; }
+        S.imp.file = `${f.name} (${Math.round(f.size / 1024)} KB)`; S.imp.csv = await f.text(); S.imp.result = null; render(); return;
+      }
       if (t.id === 'quickInput') { const fs = [...t.files]; t.value = ''; if (fs.length) quickFiles(fs); }
       if (t.id === 'imgInput') { const urls = await uploadFiles([...t.files], 'products'); S.edit.images.push(...urls); render(); if (urls.length) toast('Photos added. Save to publish them.'); }
       if (t.id === 'tryInput') { const [u] = await uploadFiles([...t.files].slice(0, 1), 'tryon'); if (u) { S.edit.tryOnImage = u; render(); } }
