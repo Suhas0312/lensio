@@ -1,10 +1,11 @@
+import { useAuth } from '@/store/auth';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Pressable, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { api, ApiError } from '@/api/client';
 import { Address, PaymentMethod, PaymentOptions, RazorpayInit } from '@/api/types';
 import { payWithRazorpay } from '@/lib/payments';
-import { Button, Card, Field, OptionCard, Row, Screen, Text } from '@/components/UI';
+import { Button, Card, Empty, Field, OptionCard, Row, Screen, Text } from '@/components/UI';
 import { colors, space } from '@/theme';
 import { inr } from '@/lib/format';
 
@@ -13,10 +14,10 @@ const METHODS: { m: PaymentMethod; title: string; sub: string; needs: 'razorpay'
   { m: 'UPI', title: 'UPI', sub: 'Google Pay, PhonePe, Paytm or any UPI app', needs: 'razorpay' },
   { m: 'CARD', title: 'Card', sub: 'Debit or credit card', needs: 'razorpay' },
   { m: 'NETBANKING', title: 'Net banking', sub: 'All major Indian banks', needs: 'razorpay' },
-  { m: 'COD', title: 'Cash on delivery', sub: 'Pay when it arrives. ₹49 handling fee.', needs: 'cod' },
 ];
 
 export default function Checkout() {
+  const user = useAuth((st) => st.user);
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [addressId, setAddressId] = useState<string>();
   const [method, setMethod] = useState<PaymentMethod>('UPI');
@@ -38,10 +39,12 @@ export default function Checkout() {
   }, []);
 
   useFocusEffect(useCallback(() => {
-    api<Address[]>('/auth/addresses').then((a) => { setAddresses(a); setAddressId((cur) => cur ?? a.find((x) => x.isDefault)?.id ?? a[0]?.id); });
+    if (!useAuth.getState().user) return;
+    api<Address[]>('/auth/addresses').then((a) => { setAddresses(a); setAddressId((cur) => cur ?? a.find((x) => x.isDefault)?.id ?? a[0]?.id); }).catch(() => {});
   }, []));
   useEffect(() => {
     const p = new URLSearchParams({ paymentMethod: method, usePoints: String(usePoints), ...(applied ? { coupon: applied } : {}), ...(giftCard ? { giftCard } : {}) });
+    if (!useAuth.getState().user) return;
     api(`/cart?${p}`).then(setQ).catch((e) => Alert.alert('Could not load your total', (e as ApiError).message));
   }, [method, applied, usePoints, giftCard]);
 
@@ -52,7 +55,7 @@ export default function Checkout() {
       const r = await api<{ order: { id: string }; payment: RazorpayInit | null }>('/orders/checkout', { body: { addressId, paymentMethod: method, couponCode: applied, giftCardCode: giftCard, usePoints } });
       if (r.payment) {
         const ok = await payWithRazorpay(r.payment, method);
-        if (!ok) Alert.alert('Payment not completed', 'Your order is saved for 30 minutes. You can pay from the order page, or choose Cash on Delivery.');
+        if (!ok) Alert.alert('Payment not completed', 'Your order is saved for 30 minutes. You can pay from the order page, or pay by UPI.');
       }
       router.replace(`/order/${r.order.id}`);
     } catch (e) {
@@ -65,6 +68,8 @@ export default function Checkout() {
       } else Alert.alert('Could not place order', err.message);
     } finally { setBusy(false); }
   };
+
+  if (!user) return <Empty title="Sign in to check out" body="Your cart and delivery details are saved on your account." action={<Button title="Sign in" onPress={() => router.push('/(auth)/login')} />} />;
 
   return (
     <Screen footer={

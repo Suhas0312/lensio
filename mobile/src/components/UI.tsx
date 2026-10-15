@@ -1,8 +1,7 @@
 import { ReactNode } from 'react';
 import {
   ActivityIndicator, Pressable, ScrollView, StyleSheet, Text as RNText, TextInput, TextInputProps,
-  TextProps, View, ViewStyle, StyleProp,
-} from 'react-native';
+  TextProps, View, ViewStyle, StyleProp, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, gradient, radius, space, type } from '@/theme';
@@ -113,5 +112,10 @@ const s = StyleSheet.create({
   radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: colors.faint, alignItems: 'center', justifyContent: 'center' },
   radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.violet },
   badge: { borderRadius: radius.pill, borderWidth: 1, borderColor: colors.cyan, paddingHorizontal: space(2) },
-  panel: { backgroundColor: colors.surface, borderRadius: radius.md, padding: space(4), borderWidth: 1, borderColor: colors.line, gap: space(3) },
+  // Glass card: translucent panel with a light edge and soft depth (frosted blur on the website).
+  panel: {
+    backgroundColor: 'rgba(21,27,77,0.62)', borderRadius: radius.md, padding: space(4), borderWidth: 1, borderColor: 'rgba(160,170,255,0.16)', gap: space(3),
+    shadowColor: '#000', shadowOpacity: 0.28, shadowRadius: 18, shadowOffset: { width: 0, height: 8 }, elevation: 3,
+    ...(Platform.OS === 'web' ? ({ backdropFilter: 'blur(14px)', WebkitBackdropFilter: 'blur(14px)' } as object) : {}),
+  },
 });

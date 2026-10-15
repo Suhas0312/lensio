@@ -5,6 +5,31 @@ Server versions are shown in `/v1/config` and the admin header. App versions are
 ## Server 2.0.11
 - **Automatic app releases:** Lensio reads the newest GitHub release (tag like v2.0.2, .apk attached, not a pre-release) of the repo in the APK link (or Admin → Settings → GitHub repo). Within 5 minutes the download page, `/download/lensio.apk` and the customers' update window switch to it, with the release notes as “What's new”. No admin step. Admin settings show “Automatic ✓ v2.0.1” or what to fix; manual fields remain as fallback. Optional `GITHUB_TOKEN` env raises GitHub's rate limit.
 
+## 3.0.0 · Server + Android app + website
+- **AI face scan & style advisor (try-on):** one voice-guided 3D scan gives face shape (from 478 face points), face width, PD and frame size, the best and “go easy on” frame shapes with reasons, and recommended frames that suit and fit (tap to try on).
+- **New look:** glass-style cards everywhere, animated AI-face-scan banner and feature tiles on Home, sliding screen transitions, press feedback on frame cards.
+- **Checked every screen** on phone and desktop browsers; fixed: checkout, lens choice and order pages now show a clear message when signed out or the link is wrong (were blank or erroring).
+- Includes everything from 2.0.12–2.0.15: wishlist, compare 3 frames, instant/offline browsing, comparison photos, gallery upload, exact size from glasses, COD removed, website shows the newest version, releases read without the GitHub API limit.
+
+## Server 2.0.15 · Phase 1: wishlist, compare, instant + offline
+- **♥ Wishlist** on every frame card and product page, and **My wishlist** in Account (saved on the account, works on app and website).
+- **Compare up to 3 frames** side by side (⇄ on cards and product page, floating Compare bar): price, savings, rating, size, frame width, lens-bridge-arm, shape, material, weight, type, colours. Differences in bold, best value marked ✓.
+- **Instant loading + offline browsing:** shop, home lists, product pages and wishlist show the copy saved on the device straight away, then refresh. Without internet, saved frames stay browsable with a “You're offline” banner.
+- Frame cards: big-discount badge and rating. Wishlist API now includes colours.
+
+## Server 2.0.14 · App 2.0.4 (automatic)
+- **AI face alignment with voice guidance:** while measuring, a 3D face scan (468 points, head pose from depth) guides the customer on screen (oval, arrows, scan line, progress ring) and aloud: come closer / move back / turn left or right / raise or lower chin / keep level / into the circle / hold still / “Done, your size is …”. Measures only when straight, level and close. Voice can be switched off.
+- **Compare 4 frames:** after Capture, one image of the photo wearing the current frame and the next three, labelled with name and price; save or share it.
+- **Upload photo (gallery / files):** the Android app opens its own picker (Gallery or Files); browsers offer Photos/Files/Camera; computers can drag a photo onto the picture.
+- **Cash on Delivery removed:** UPI / online payment only; switched off on the server for every app version; admin shows payments note. Past COD orders can still be completed.
+- **Website version label** shows the newest released version (same as /download); the Android app shows its installed version.
+
+## Server 2.0.14
+- **Website shows the newest version** (same as /download) instead of the version baked in when the website was built.
+- **Cash on Delivery removed** everywhere customers see it; UPI / online only. Old COD orders can still be completed in admin.
+- **Capture shows several frames:** the photo opens as a 2×2 comparison of the frames you tried (one tap for a single frame).
+- Upload button: “Upload photo (gallery / files)”.
+
 ## Server 2.0.13
 - **Download page and in-app updates now always follow the newest release.** The server asked GitHub's API, which allows only 60 requests an hour per address; Render's shared addresses used that up, so the page fell back to the admin version (2.0.2 while 2.0.3 was out). Releases are now read from GitHub's public pages (no limit), checked every 3 minutes. Verified live: v2.0.3.
 

@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, ScrollView, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useLayout } from '@/lib/layout';
-import { api, qs } from '@/api/client';
+import { api, cachedApi, qs } from '@/api/client';
+import { CompareBar } from '@/components/CompareBar';
 import { Product } from '@/api/types';
 import { ProductCard } from '@/components/ProductCard';
 import { Chip, Empty, Field, Row, Text } from '@/components/UI';
@@ -57,9 +58,14 @@ export default function Shop() {
   const load = useCallback(async (p: number) => {
     setLoading(true);
     try {
-      const r = await api<{ items: Product[]; pages: number }>('/catalog/products' + qs({ q, shape, size, sort, gender, minPrice, maxPrice, page: p, sunglasses: kind === 'all' ? undefined : String(kind === 'sunglasses'), maxLensWidth }));
+      const path = '/catalog/products' + qs({ q, shape, size, sort, gender, minPrice, maxPrice, page: p, sunglasses: kind === 'all' ? undefined : String(kind === 'sunglasses'), maxLensWidth });
+      type R = { items: Product[]; pages: number };
+      // Page 1 shows the saved copy instantly (and works offline); later pages load normally.
+      const r = p === 1
+        ? await cachedApi<R>(path, (saved) => { setItems(saved.items); setPages(saved.pages); setPage(1); setLoading(false); })
+        : await api<R>(path);
       setItems((prev) => (p === 1 ? r.items : [...prev, ...r.items])); setPages(r.pages); setPage(p);
-    } finally { setLoading(false); }
+    } catch { /* offline with nothing saved yet: the empty state explains */ } finally { setLoading(false); }
   }, [q, shape, size, sort, kind, gender, minPrice, maxPrice, maxLensWidth]);
 
   useEffect(() => { const t = setTimeout(() => load(1), 250); return () => clearTimeout(t); }, [load]);
@@ -112,6 +118,7 @@ export default function Shop() {
         ListFooterComponent={loading && items.length ? <ActivityIndicator color={colors.violet} /> : <View style={{ height: 70 }} />}
       />
       <ChatFab />
+      <CompareBar />
     </View>
   );
 }

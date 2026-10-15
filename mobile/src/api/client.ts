@@ -1,6 +1,8 @@
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
+import { create } from 'zustand';
+import { getJSON, setJSON } from '@/lib/deviceStore';
 
 // Phones keep the sign-in token in the secure keychain; browsers use localStorage.
 const store = Platform.OS === 'web'
@@ -49,6 +51,32 @@ export async function api<T = any>(path: string, opts: { method?: string; body?:
     throw new ApiError(res.status, json?.error?.code ?? 'ERROR', json?.error?.message ?? 'Something went wrong', json?.error?.details);
   }
   return json as T;
+}
+
+/** Online/offline state, shown as a small banner when the shop is browsed from saved data. */
+export const useNet = create<{ offline: boolean; set: (offline: boolean) => void }>((set) => ({ offline: false, set: (offline) => set({ offline }) }));
+
+/**
+ * Instant loading + offline browsing for read-only pages (frames, product pages, home lists):
+ * shows the copy saved on the device straight away (onCached), then refreshes from the server.
+ * Without internet the saved copy is used and the offline banner appears.
+ */
+export async function cachedApi<T>(path: string, onCached?: (data: T) => void): Promise<T> {
+  const key = `get:${path}`;
+  const saved = await getJSON<{ at: number; data: T }>(key);
+  if (saved && onCached) onCached(saved.data);
+  try {
+    const fresh = await api<T>(path);
+    useNet.getState().set(false);
+    setJSON(key, { at: Date.now(), data: fresh });
+    return fresh;
+  } catch (e) {
+    if ((e as ApiError).code === 'NETWORK') {
+      useNet.getState().set(true);
+      if (saved) return saved.data;
+    }
+    throw e;
+  }
 }
 
 export const qs = (o: Record<string, string | number | undefined | null>) => {

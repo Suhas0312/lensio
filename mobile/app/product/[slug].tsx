@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Image, ScrollView, View } from 'react-native';
+import { Image, ScrollView, View, Pressable } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams, Stack } from 'expo-router';
 import { useLayout } from '@/lib/layout';
-import { api } from '@/api/client';
+import { api, cachedApi } from '@/api/client';
+import { useCompare, useWishlist } from '@/store/shopping';
 import { FrameSize, Product } from '@/api/types';
 import { useLensFlow } from '@/store/lensFlow';
 import { useAuth } from '@/store/auth';
@@ -26,14 +28,17 @@ export default function ProductScreen() {
   const [size, setSize] = useState<FrameSize>();
   const start = useLensFlow((s) => s.start);
   const user = useAuth((s) => s.user);
+  const liked = useWishlist((s) => (p ? s.ids.has(p.id) : false)), toggleLike = useWishlist((s) => s.toggle);
+  const comparing = useCompare((s) => (p ? s.items.some((x) => x.id === p.id) : false)), toggleCompare = useCompare((s) => s.toggle);
 
   useEffect(() => {
-    api<Product>(`/catalog/products/${slug}`).then((r) => {
+    const apply = (r: Product) => {
       setP(r);
       // Size measured in the try-on (or chosen there) is preselected when that size is in stock.
       const first = r.variants.find((v) => v.size === wantSize && v.stock > 0) ?? r.variants.find((v) => v.stock > 0) ?? r.variants[0];
       setColor(first?.colorHex); setSize(first?.size);
-    });
+    };
+    cachedApi<Product>(`/catalog/products/${slug}`, apply).then(apply).catch(() => {});
   }, [slug]);
 
   const colorsList = useMemo(() => p ? [...new Map(p.variants.map((v) => [v.colorHex, v])).values()] : [], [p]);
@@ -68,7 +73,16 @@ export default function ProductScreen() {
       </ScrollView>
 
       <View style={{ gap: space(1) }}>
-        <Text v="heading">{p.name}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space(2) }}>
+          <Text v="heading" style={{ flex: 1 }}>{p.name}</Text>
+          <Pressable onPress={() => toggleLike(p)} hitSlop={8} accessibilityRole="button" accessibilityLabel={liked ? 'Remove from wishlist' : 'Save to wishlist'} style={{ padding: 6 }}>
+            <Ionicons name={liked ? 'heart' : 'heart-outline'} size={26} color={liked ? '#e11d48' : colors.text} />
+          </Pressable>
+          <Pressable onPress={() => toggleCompare(p)} hitSlop={8} accessibilityRole="button" accessibilityLabel={comparing ? 'Remove from compare' : 'Add to compare'} style={{ padding: 6 }}>
+            <Ionicons name="git-compare-outline" size={24} color={comparing ? colors.violet : colors.text} />
+          </Pressable>
+        </View>
+        {comparing ? <Pressable onPress={() => router.push('/compare')}><Text v="caption" color={colors.cyan}>In your compare list · Compare now →</Text></Pressable> : null}
         <Row style={{ gap: space(2) }}>
           <Text v="title">{inr(price)}</Text>
           {p.mrp > price ? <Text color={colors.faint} style={{ textDecorationLine: 'line-through' }}>{inr(p.mrp)}</Text> : null}

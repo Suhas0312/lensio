@@ -15,6 +15,12 @@ import { colors, space } from '@/theme';
 
 export default function Account() {
   const { user, signOut, setUser } = useAuth();
+  // Website: show the newest released version (same as /download); the Android app shows its installed version.
+  const [latestVersion, setLatestVersion] = useState<string | null>(null);
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    api<{ app?: { latestVersion?: string | null } }>('/config').then((c) => setLatestVersion(c.app?.latestVersion ?? null)).catch(() => {});
+  }, []);
   const [name, setName] = useState(user?.name ?? '');
   const [savingName, setSavingName] = useState(false);
   // The page can open before sign-in finishes: show the saved name as soon as the account loads.
@@ -134,6 +140,20 @@ export default function Account() {
 
       <FollowInstagram />
 
+      {user ? (
+        <Card>
+          <Pressable onPress={() => router.push('/wishlist')} accessibilityRole="button"><Row>
+            <Ionicons name="heart" size={22} color="#e11d48" />
+            <View style={{ flex: 1 }}><Text v="bodyStrong">My wishlist</Text><Text v="caption" color={colors.muted}>Frames you saved with ♥</Text></View>
+            <Ionicons name="chevron-forward" size={18} color={colors.muted} />
+          </Row></Pressable>
+          <Pressable onPress={() => router.push('/compare')} accessibilityRole="button" style={{ marginTop: space(4) }}><Row>
+            <Ionicons name="git-compare-outline" size={22} color={colors.violet} />
+            <View style={{ flex: 1 }}><Text v="bodyStrong">Compare frames</Text><Text v="caption" color={colors.muted}>Up to 3 frames side by side</Text></View>
+            <Ionicons name="chevron-forward" size={18} color={colors.muted} />
+          </Row></Pressable>
+        </Card>
+      ) : null}
       {Platform.OS === 'web' ? <GetAndroidApp /> : null}
       {Platform.OS === 'android' ? <CheckForUpdates /> : null}
 
@@ -142,7 +162,7 @@ export default function Account() {
       <View style={{ alignItems: 'center', gap: space(2), paddingTop: space(6) }}>
         <Logo variant="mark" height={44} />
         <Logo variant="tagline" height={14} />
-        <Text v="caption" color={colors.faint}>Version {Constants.expoConfig?.version}</Text>
+        <Text v="caption" color={colors.faint}>Version {Platform.OS === 'web' ? (latestVersion ?? Constants.expoConfig?.version) : Constants.expoConfig?.version}</Text>
       </View>
     </Screen>
   );

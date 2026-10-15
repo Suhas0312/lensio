@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { api, ApiError } from '@/api/client';
 import { RazorpayInit } from '@/api/types';
-import { Button, Card, Loading, Row, Text } from '@/components/UI';
+import { Button, Card, Empty, Loading, Row, Text } from '@/components/UI';
 import { Timeline } from '@/components/Timeline';
 import { UpiPay } from '@/components/UpiPay';
 import { FollowInstagram } from '@/components/FollowInstagram';
@@ -17,6 +17,7 @@ export default function OrderScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [o, setO] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [loadErr, setLoadErr] = useState<string | null>(null);
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
   const [justChanged, setJustChanged] = useState(false);
   const lastStatus = useRef<string | null>(null);
@@ -28,7 +29,10 @@ export default function OrderScreen() {
       if (lastStatus.current && lastStatus.current !== next.status) { setJustChanged(true); setTimeout(() => setJustChanged(false), 6000); }
       lastStatus.current = next.status;
       setO(next); setUpdatedAt(new Date());
-    } catch { /* keep showing the last known state; the next refresh will retry */ }
+    } catch (e) {
+      // first load failed (wrong link, signed out, or someone else's order): say so instead of a blank page
+      if (!quiet) setLoadErr((e as { status?: number }).status === 401 ? 'Sign in to see this order.' : 'This order could not be found.');
+    }
     finally { if (!quiet) setLoading(false); }
   }, [id]);
   const load = useCallback(() => fetchOrder(false), [fetchOrder]);
@@ -50,6 +54,7 @@ export default function OrderScreen() {
     a.start(); return () => a.stop();
   }, [live, pulse]);
 
+  if (!o && loadErr) return <Empty title={loadErr} body="Your orders are listed in the Orders tab." action={<Button title="Go to my orders" onPress={() => router.replace('/(tabs)/orders')} />} />;
   if (!o) return <Loading />;
 
   const payNow = async () => {

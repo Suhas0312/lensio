@@ -5,7 +5,7 @@ import { useCallback } from 'react';
 import { api, ApiError, qs } from '@/api/client';
 import { Coating, LensTypeOption, Prescription } from '@/api/types';
 import { useLensFlow } from '@/store/lensFlow';
-import { Button, Loading, OptionCard, Row, Screen, Text } from '@/components/UI';
+import { Button, Loading, OptionCard, Row, Screen, Text, Empty } from '@/components/UI';
 import { colors, space } from '@/theme';
 import { inr } from '@/lib/format';
 
@@ -20,13 +20,17 @@ export default function LensFlow() {
   const [rxList, setRxList] = useState<Prescription[]>([]);
   const [step, setStep] = useState<Step>('type');
   const [busy, setBusy] = useState(false);
+  const [loadErr, setLoadErr] = useState<string | null>(null);
+  const [retry, setRetry] = useState(0);
 
   useEffect(() => {
     api<{ types: LensTypeOption[]; coatings: Coating[] }>('/lens/options' + qs({ sunglasses: String(f.isSunglasses) }))
-      .then((r) => { setTypes(f.isSunglasses ? r.types.filter((t) => t.lensType === 'SINGLE_VISION_DISTANCE' || t.lensType === 'ZERO_POWER') : r.types); setCoatings(r.coatings); });
-  }, [f.isSunglasses]);
+      .then((r) => { setTypes(f.isSunglasses ? r.types.filter((t) => t.lensType === 'SINGLE_VISION_DISTANCE' || t.lensType === 'ZERO_POWER') : r.types); setCoatings(r.coatings); setLoadErr(null); })
+      .catch((e) => setLoadErr((e as Error).message || 'Could not load lens options.'));
+  }, [f.isSunglasses, retry]);
   useFocusEffect(useCallback(() => { api<Prescription[]>('/prescriptions').then(setRxList).catch(() => {}); }, []));
 
+  if (loadErr && !types.length) return <Empty title="Could not load lens options" body={loadErr} action={<Button title="Try again" onPress={() => setRetry((n) => n + 1)} />} />;
   if (!types.length) return <Loading />;
   const needsRx = !!f.type?.requiresPrescription;
   const visibleSteps = STEPS.filter((s) => s !== 'prescription' || needsRx);

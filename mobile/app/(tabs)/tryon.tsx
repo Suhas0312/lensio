@@ -1,4 +1,4 @@
-import { createElement, useCallback, useEffect, useState } from 'react';
+import { createElement, useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Linking, Platform, View } from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -42,6 +42,7 @@ function WebTryOn({ src }: { src: string }) {
 }
 
 function NativeTryOn({ src }: { src: string }) {
+  const webRef = useRef<any>(null);
   // Required here (not at the top) so the web build never loads the native camera module.
   const { useCameraPermissions } = require('expo-camera') as typeof import('expo-camera');
   const [perm, requestPerm] = useCameraPermissions();
@@ -64,10 +65,14 @@ function NativeTryOn({ src }: { src: string }) {
 
   // Loaded lazily so the web build never touches the native module.
   const { WebView } = require('react-native-webview') as typeof import('react-native-webview');
+  const web = webRef;
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.night }}>
       <WebView
+        ref={web}
         source={{ uri: src }}
+        // Tells the try-on page to use the app's own photo picker (Gallery / Files) for "Photo from gallery".
+        injectedJavaScriptBeforeContentLoaded={'window.__lensioNativePicker = true; true;'}
         style={{ flex: 1, backgroundColor: colors.night }}
         mediaCapturePermissionGrantType="grant"
         allowsInlineMediaPlayback
@@ -79,7 +84,9 @@ function NativeTryOn({ src }: { src: string }) {
         onMessage={(e) => {
           try {
             const m = JSON.parse(e.nativeEvent.data);
-            if (m.type === 'save' && m.dataUrl) saveToGallery(m.dataUrl);
+            if (m.type === 'pickPhoto') pickPhoto((dataUrl) => web.current?.injectJavaScript(`window.__lensioUsePhoto && window.__lensioUsePhoto(${JSON.stringify(dataUrl)}); true;`));
+            else if (m.type === 'speak' && m.text) speakAloud(String(m.text));
+            else if (m.type === 'save' && m.dataUrl) saveToGallery(m.dataUrl);
             else if (m.type === 'capture' && m.dataUrl) saveCapture(m.dataUrl);
             else onPageMessage(m);
           } catch { /* ignore */ }
@@ -87,6 +94,46 @@ function NativeTryOn({ src }: { src: string }) {
       />
     </SafeAreaView>
   );
+}
+
+/** "Photo from gallery": lets the customer choose a photo from Gallery/Photos or from Files, then hands it to the try-on page. */
+function pickPhoto(send: (dataUrl: string) => void) {
+  const fromGallery = async () => {
+    try {
+      const ImagePicker = require('expo-image-picker') as typeof import('expo-image-picker');
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) { Alert.alert('Allow photos', 'To choose a photo, allow Lensio to access your photos in your phone settings.'); return; }
+      const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.7, base64: true, exif: false });
+      const a = r.canceled ? null : r.assets?.[0];
+      if (a?.base64) send(`data:${a.mimeType || 'image/jpeg'};base64,${a.base64}`);
+    } catch { Alert.alert('Could not open your photos', 'Please try again.'); }
+  };
+  const fromFiles = async () => {
+    try {
+      const DocumentPicker = require('expo-document-picker') as typeof import('expo-document-picker');
+      const FileSystem = require('expo-file-system') as typeof import('expo-file-system');
+      const r = await DocumentPicker.getDocumentAsync({ type: 'image/*', copyToCacheDirectory: true, multiple: false });
+      const a = r.canceled ? null : r.assets?.[0];
+      if (!a) return;
+      if ((a.size ?? 0) > 15 * 1024 * 1024) { Alert.alert('Photo too large', 'Choose a photo under 15 MB.'); return; }
+      const b64 = await FileSystem.readAsStringAsync(a.uri, { encoding: FileSystem.EncodingType.Base64 });
+      send(`data:${a.mimeType || 'image/jpeg'};base64,${b64}`);
+    } catch { Alert.alert('Could not open your files', 'Please try again.'); }
+  };
+  Alert.alert('Choose a photo', 'Use a front-facing photo of your face, without glasses.', [
+    { text: '📷 Gallery', onPress: fromGallery },
+    { text: '📁 Files', onPress: fromFiles },
+    { text: 'Cancel', style: 'cancel' },
+  ]);
+}
+
+/** Voice guidance from the try-on (face alignment while measuring), in the phone's own voice. */
+function speakAloud(text: string) {
+  try {
+    const Speech = require('expo-speech') as typeof import('expo-speech');
+    Speech.stop();
+    Speech.speak(text.slice(0, 160), { language: 'en-IN', rate: 1.0 });
+  } catch { /* no voice on this phone */ }
 }
 
 /** "Save to gallery": puts the try-on photo straight into the phone's Gallery / Photos (Lensio album). */
