@@ -65,6 +65,15 @@ header h1{font-size:18px;margin:0;flex:1}
 .picks{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:6px}
 .pick{background:#f4f5fb;border:0;border-radius:12px;padding:6px;display:flex;flex-direction:column;align-items:flex-start;gap:2px;cursor:pointer;color:#0b0f2e;text-align:left}
 .pick img{width:100%;aspect-ratio:2.4;object-fit:contain}.pick span{font-weight:700;font-size:12px}.pick small{font-size:11px;color:#4b5175}
+.pdtool{position:fixed;inset:0;background:rgba(2,3,20,.88);z-index:50;display:flex;align-items:center;justify-content:center;padding:12px}
+.pdtool[hidden]{display:none}
+.pdbox{background:#0c1138;border:1px solid #2a2f6b;border-radius:18px;padding:16px;max-width:720px;width:100%;max-height:96vh;overflow:auto}
+.pdhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.pdsteps{padding-left:20px;line-height:1.5}.pdbtns{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+.pdcanvaswrap{position:relative;touch-action:none}
+#pdCanvas{width:100%;border-radius:12px;display:block;touch-action:none;cursor:ew-resize}
+#pdLoupe{position:absolute;right:8px;top:8px;width:110px;height:110px;border-radius:50%;border:2px solid #fff;pointer-events:none;display:none}
+.pdresult{margin-top:8px;font-size:15px}
 .swatches{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:-4px}
 .sw{width:30px;height:30px;border-radius:50%;background:var(--c);border:2px solid var(--line);cursor:pointer;padding:0;box-shadow:inset 0 0 0 2px var(--night)}
 .sw.on{border-color:#fff}
@@ -111,6 +120,7 @@ header h1{font-size:18px;margin:0;flex:1}
         <div class="chips" id="sizeChips" role="group" aria-label="Frame size"></div>
         <label class="small" style="display:flex;gap:8px;align-items:center;margin-top:8px"><input type="checkbox" id="voiceChk" checked> 🔊 Speak instructions while measuring</label>
         <button class="linkbtn" id="exactBtn" type="button">📐 Exact size: enter the numbers from your current glasses</button>
+        <button class="btn" id="cardPdBtn" type="button" style="margin-top:8px;width:100%">💳 Precise PD with a card (±1 mm)</button>
         <div id="exactBox" hidden style="margin-top:10px">
           <p class="muted small" style="margin:0 0 8px">Look inside the arm of glasses that fit you well. You'll see numbers like <b>52□18-140</b> (lens width, bridge, arm length).</p>
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
@@ -131,6 +141,27 @@ header h1{font-size:18px;margin:0;flex:1}
     </div>
   </div>
 </div>
+<div class="pdtool" id="pdTool" role="dialog" aria-label="Precise PD with a card" hidden>
+  <div class="pdbox">
+    <div class="pdhead"><b>💳 Precise PD with a card</b><button class="linkbtn" id="pdClose" type="button" aria-label="Close">✕</button></div>
+    <div id="pdStep1">
+      <ol class="small pdsteps">
+        <li>Take off your glasses. Hold any bank, ATM or ID card <b>flat against your forehead</b>, just above your eyebrows, long side across.</li>
+        <li>Face the camera straight, about an arm's length away, eyes open, looking at the lens.</li>
+        <li>Tap <b>Take photo</b> (3-second countdown), or use a photo from your gallery.</li>
+      </ol>
+      <p class="muted small">All bank/ID cards are exactly 85.6 mm wide (ISO standard), so the card gives a true millimetre scale. Nothing is uploaded.</p>
+      <div class="pdbtns"><button class="btn p" id="pdShoot" type="button">📸 Take photo</button><button class="btn" id="pdPick" type="button">🖼️ From gallery</button></div>
+      <input type="file" id="pdFile" accept="image/*" hidden>
+    </div>
+    <div id="pdStep2" hidden>
+      <p class="small" style="margin:0 0 6px">Drag the two <b style="color:#f43f5e">red lines</b> exactly onto the <b>left and right edges of the card</b>. Check the <b style="color:#22d3ee">blue dots</b> sit in the centre of each pupil (drag to fix).</p>
+      <div class="pdcanvaswrap"><canvas id="pdCanvas"></canvas><canvas id="pdLoupe" width="150" height="150"></canvas></div>
+      <div class="pdresult" id="pdResult"></div>
+      <div class="pdbtns"><button class="btn p" id="pdUse" type="button">Use this PD</button><button class="btn" id="pdRetake" type="button">Retake</button></div>
+    </div>
+  </div>
+</div>
 <div class="shot" id="shot" role="dialog" aria-label="Your try-on photo">
   <img id="shotImg" alt="Your try-on photo">
   <div class="actions">
@@ -144,6 +175,6 @@ header h1{font-size:18px;margin:0;flex:1}
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <script src="/tryon/face-api.js" defer></script>
-<script src="/tryon/tryon.js?v=10" defer></script>
+<script src="/tryon/tryon.js?v=11" defer></script>
 </body>
 </html>

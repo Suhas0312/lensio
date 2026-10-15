@@ -585,7 +585,9 @@
     $('#sizeText').innerHTML = m
       ? (m.source === 'glasses'
         ? `From your glasses <b>${m.lens}□${m.bridge}</b> · frame width about <b>${m.face} mm</b>${m.pd ? ` · PD <b>${m.pd} mm</b>` : ''}<br>Your size: <b>${SIZE_LABEL[m.size]}</b> <span class="muted small">(${SIZE_RANGE[m.size]}) · exact</span>`
-        : `Face width <b>${m.face} mm</b> · PD <b>${m.pd} mm</b><br>Your size: <b>${SIZE_LABEL[m.size]}</b> <span class="muted small">(${SIZE_RANGE[m.size]}) · camera estimate ±2 mm${m.photo ? ', from a photo' : ''}</span><br><span class="muted small">For an exact size, use the numbers from your current glasses below.</span>`)
+        : !m.face
+          ? `PD <b>${m.pd} mm</b> <span class="muted small">(card method, ±1 mm)</span><br><span class="muted small">Run ✨ AI face scan or enter your glasses numbers for your frame size.</span>`
+          : `Face width <b>${m.face} mm</b> · PD <b>${m.pd} mm</b>${m.pdSource === 'card' ? ' <span class="muted small">(card, ±1 mm)</span>' : ''}<br>Your size: <b>${SIZE_LABEL[m.size]}</b> <span class="muted small">(${SIZE_RANGE[m.size]}) · camera estimate ±2 mm${m.photo ? ', from a photo' : ''}</span><br><span class="muted small">For an exact size, use the numbers from your current glasses below.</span>`)
       : 'Tap <b>✨ AI face scan</b> (live camera, glasses off) for your face shape and size, or pick a size.';
     $('#sizeChips').innerHTML = ['', 'SMALL', 'MEDIUM', 'WIDE'].map((k) => `<button class="chip ${(S.sizeFilter || '') === k ? 'on' : ''}" data-size="${k}">${k ? SIZE_LABEL[k] + (m && m.size === k ? ' ✓' : '') : 'All sizes'}</button>`).join('');
   }
@@ -762,6 +764,93 @@
     $('#shotImg').src = lastShot;
   });
   $('#report').addEventListener('click', (e) => { const b = e.target.closest('.pick'); if (b) { select(b.dataset.id); window.scrollTo({ top: 0, behavior: 'smooth' }); } });
+  // ---------- Precise PD with a card (ISO/IEC 7810 ID-1 card: 85.60 mm wide) ----------
+  const CARD_MM = 85.6;
+  const pd = { img: null, L: null, R: null, x1: 0, x2: 0, drag: null, scale: 1 };
+  window.__lensioPd = pd; // for diagnostics
+  function pdOpen() { $('#pdTool').hidden = false; $('#pdStep1').hidden = false; $('#pdStep2').hidden = true; speak('Hold a bank card flat against your forehead, just above your eyebrows. Look straight at the camera.', true); }
+  function pdClose() { $('#pdTool').hidden = true; }
+  async function pdShoot() {
+    if (S.mode !== 'live') { await startCam(); await new Promise((r) => setTimeout(r, 900)); }
+    if (S.mode !== 'live' || !video.videoWidth) { toast('Turn on the camera, or use a photo from your gallery.'); return; }
+    pdClose();
+    for (const n of [3, 2, 1]) { status(`💳 Hold the card on your forehead… ${n}`); speak(String(n), true); await new Promise((r) => setTimeout(r, 900)); }
+    const c = document.createElement('canvas'); c.width = video.videoWidth; c.height = video.videoHeight;
+    c.getContext('2d').drawImage(video, 0, 0);                      // not mirrored: true geometry
+    status('<span class="dot"></span>Photo taken');
+    await pdAnalyse(c.toDataURL('image/jpeg', 0.95));
+  }
+  async function pdAnalyse(url) {
+    const img = new Image(); img.src = url; await img.decode();
+    $('#pdTool').hidden = false; $('#pdStep1').hidden = true; $('#pdStep2').hidden = false;
+    $('#pdResult').textContent = 'Finding your pupils…';
+    const W = img.naturalWidth, H = img.naturalHeight;
+    let L = null, R = null, irisPx = null;
+    try {
+      const fm = await mesh(); const res = await meshOnce(fm, img);
+      const lm = res && res.multiFaceLandmarks && res.multiFaceLandmarks[0];
+      if (lm && lm.length > 473) {
+        L = { x: lm[468].x * W, y: lm[468].y * H }; R = { x: lm[473].x * W, y: lm[473].y * H };
+        irisPx = (Math.hypot((lm[469].x - lm[471].x) * W, (lm[469].y - lm[471].y) * H) + Math.hypot((lm[474].x - lm[476].x) * W, (lm[474].y - lm[476].y) * H)) / 2;
+      }
+    } catch { /* manual placement below */ }
+    if (!L) { L = { x: W * 0.4, y: H * 0.45 }; R = { x: W * 0.6, y: H * 0.45 }; toast('Could not find your eyes automatically: drag the blue dots onto your pupils.'); }
+    // first guess for the card edges: card ≈ 85.6 mm, iris ≈ 11.7 mm
+    const cx = (L.x + R.x) / 2, half = irisPx ? (CARD_MM / 11.7) * irisPx / 2 : Math.abs(R.x - L.x) * 0.68;
+    Object.assign(pd, { img, L, R, x1: cx - half, x2: cx + half, drag: null });
+    pdDraw();
+  }
+  function pdDraw() {
+    const cv = $('#pdCanvas'), img = pd.img; if (!img) return;
+    cv.width = img.naturalWidth; cv.height = img.naturalHeight; pd.scale = img.naturalWidth / (cv.clientWidth || img.naturalWidth);
+    const g = cv.getContext('2d'); g.drawImage(img, 0, 0);
+    const lw = Math.max(2, cv.width / 400);
+    g.strokeStyle = '#f43f5e'; g.lineWidth = lw * 1.5;
+    for (const x of [pd.x1, pd.x2]) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, cv.height); g.stroke(); g.fillStyle = '#f43f5e'; g.fillRect(x - lw * 6, cv.height / 2 - lw * 18, lw * 12, lw * 36); }
+    g.fillStyle = '#22d3ee'; g.strokeStyle = '#fff'; g.lineWidth = lw;
+    for (const p of [pd.L, pd.R]) { g.beginPath(); g.arc(p.x, p.y, lw * 4, 0, 7); g.fill(); g.stroke(); }
+    g.strokeStyle = '#22d3ee'; g.setLineDash([lw * 4, lw * 3]); g.beginPath(); g.moveTo(pd.L.x, pd.L.y); g.lineTo(pd.R.x, pd.R.y); g.stroke(); g.setLineDash([]);
+    const cardPx = Math.abs(pd.x2 - pd.x1), eyePx = Math.hypot(pd.R.x - pd.L.x, pd.R.y - pd.L.y);
+    const value = cardPx > 20 ? eyePx * CARD_MM / cardPx : null;
+    pd.value = value && value > 40 && value < 85 ? Math.round(value * 2) / 2 : null;   // to the nearest 0.5 mm
+    $('#pdResult').innerHTML = pd.value ? `Your PD: <b style="font-size:20px">${pd.value} mm</b> <span class="muted small">(card method, typically ±1 mm when the lines sit on the card edges)</span>`
+      : 'Move the red lines onto the card edges.';
+  }
+  function pdLoupe(px, py) {
+    const lo = $('#pdLoupe'), g = lo.getContext('2d'), z = 3, r = 75 / z;
+    lo.style.display = 'block'; g.clearRect(0, 0, 150, 150);
+    g.drawImage($('#pdCanvas'), px - r, py - r, r * 2, r * 2, 0, 0, 150, 150);
+    g.strokeStyle = '#fff'; g.beginPath(); g.moveTo(75, 60); g.lineTo(75, 90); g.moveTo(60, 75); g.lineTo(90, 75); g.stroke();
+  }
+  function pdPointer(e) {
+    const cv = $('#pdCanvas'), rect = cv.getBoundingClientRect(), k = cv.width / rect.width;
+    const x = (e.clientX - rect.left) * k, y = (e.clientY - rect.top) * k;
+    if (e.type === 'pointerdown') {
+      const near = (p) => Math.hypot(p.x - x, p.y - y) < 30 * k;
+      pd.drag = near(pd.L) ? 'L' : near(pd.R) ? 'R' : Math.abs(x - pd.x1) < Math.abs(x - pd.x2) ? 'x1' : 'x2';
+      cv.setPointerCapture(e.pointerId);
+    }
+    if (!pd.drag) return;
+    if (pd.drag === 'L' || pd.drag === 'R') pd[pd.drag] = { x, y }; else pd[pd.drag] = x;
+    pdDraw(); pdLoupe(x, y);
+    if (e.type === 'pointerup' || e.type === 'pointercancel') { pd.drag = null; $('#pdLoupe').style.display = 'none'; }
+  }
+  function pdUse() {
+    if (!pd.value) { toast('Line up the red lines with the card edges first.'); return; }
+    const m = S.measure || { face: null, size: null, source: 'card' };
+    applyMeasure({ ...m, pd: pd.value, pdSource: 'card', size: m.size || S.sizeFilter || null });
+    pdClose(); renderSize(); place();
+    toast(`PD saved: ${pd.value} mm`); speak(`Your PD is ${pd.value} millimetres.`, true);
+  }
+  $('#cardPdBtn').addEventListener('click', pdOpen);
+  $('#pdClose').addEventListener('click', pdClose);
+  $('#pdShoot').addEventListener('click', pdShoot);
+  $('#pdPick').addEventListener('click', () => $('#pdFile').click());
+  $('#pdFile').addEventListener('change', (e) => { const f = e.target.files[0]; if (f) pdAnalyse(URL.createObjectURL(f)); e.target.value = ''; });
+  $('#pdRetake').addEventListener('click', () => { $('#pdStep1').hidden = false; $('#pdStep2').hidden = true; });
+  $('#pdUse').addEventListener('click', pdUse);
+  for (const ev of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel']) $('#pdCanvas').addEventListener(ev, pdPointer);
+
   $('#exactBtn').addEventListener('click', () => { $('#exactBox').hidden = !$('#exactBox').hidden; });
   $('#exSave').addEventListener('click', exactFromGlasses);
   S.voice = true;

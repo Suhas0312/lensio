@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 
 export interface ProductCard { slug: string; name: string; price: number; mrp: number; image: string | null }
-export interface Msg { id: string; role: 'user' | 'assistant'; text: string; products?: ProductCard[]; handoff?: boolean; failed?: boolean }
+export interface Msg { id: string; role: 'user' | 'assistant'; text: string; products?: ProductCard[]; handoff?: boolean; failed?: boolean; imageUri?: string }
 
 const hello: Msg = {
   id: 'hello', role: 'assistant',
