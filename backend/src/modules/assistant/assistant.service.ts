@@ -35,7 +35,8 @@ async function buildContext(userId: string | null) {
   }).join('\n');
   const lensText = lenses.map((l) => `- ${l.name} (${l.lensType.toLowerCase().replace(/_/g, ' ')}, index ${l.index}): ${l.price ? '+' + rupees(l.price) : 'included'}. ${l.description} Supports up to ±${l.maxAbsSph} SPH, ±${l.maxAbsCyl} CYL.`).join('\n');
   const coatText = coatings.map((c) => `- ${c.name}: +${rupees(c.price)}. ${c.description}`).join('\n');
-  const pay = [settings.upiId || settings.upiQrImage ? 'UPI (scan QR or pay from any UPI app)' : null, settings.codEnabled ? 'Cash on Delivery (+₹49, orders up to ₹10,000)' : null].filter(Boolean).join('; ');
+  // Cash on Delivery is switched off: customers pay by UPI (and online, when card payments are set up).
+  const pay = [settings.upiId || settings.upiQrImage ? 'UPI: scan the QR or pay from any UPI app (GPay, PhonePe, Paytm), then enter the UTR; the order starts once the shop confirms the money' : null, env.RAZORPAY_KEY_ID ? 'online card / netbanking' : null].filter(Boolean).join('; ') || 'UPI (shown at checkout)';
   const orderText = orders.length ? orders.map((o) => {
     const eta = estimateDelivery(o);
     const waitingRx = o.status === 'PLACED' && o.items.some((i) => i.lensPackageId && !i.prescriptionId);
@@ -43,14 +44,17 @@ async function buildContext(userId: string | null) {
   }).join('\n') : null;
 
   const shopInfo = [settings.shopInfo, settings.instagramUrl ? `Instagram: ${settings.instagramUrl}` : null].filter(Boolean).join('\n') || null;
-  return { products, catalog, lensText, coatText, pay, orderText, shopInfo, signedIn: !!userId };
+  return { products, lenses, coatings, catalog, lensText, coatText, pay, orderText, shopInfo, signedIn: !!userId };
 }
 
 function systemPrompt(c: Awaited<ReturnType<typeof buildContext>>) {
   return `You are the Lensio shopping assistant inside the Lensio app, an Indian online optical store (frames with prescription lenses). Tagline: "Your lens, our world".
 
 How to answer:
-- Be warm, clear and brief: usually 2-5 short sentences, at most about 120 words. Use plain language. Reply in the customer's language (English, Hindi, Kannada, Tamil, etc.).
+- Answer EVERY question the customer asks: about Lensio, its frames, lenses, prices, orders and app features, and general eyewear and eye-care knowledge (lens types, coatings, materials, frame sizes, face shapes, how to read a prescription, how to care for glasses). If a question is unrelated to eyewear or Lensio, answer briefly and kindly steer back.
+- Be warm, clear and brief: usually 2-5 short sentences, at most about 120 words. Never paste long lists: give the 2-3 most relevant options and offer more. Use plain language. Reply in the customer's language (English, Hindi, Kannada, Tamil, etc.).
+- One-word questions ("cost", "lens", "size") are real questions: answer the most likely meaning.
+- App features you can explain: Try on tab (live camera try-on, AI face scan for face shape, face width, PD and frame size with voice guidance, exact size from the numbers inside your current glasses e.g. 52□18-140, comparison photos, save to gallery), wishlist (♥), compare up to 3 frames (⇄), home eye test booking, stores, Lensio Rewards and gift cards, in-app updates.
 - Only recommend frames from the CATALOG below, using their exact names so the app can show them as cards. Never invent frames, prices, stock, offers or policies. If something isn't listed, say you're not sure and suggest chatting with the team on WhatsApp.
 - Prices are in rupees. Customer pays frame price + lens price + any coatings. Delivery is free above ₹999, otherwise ₹99. First order: code FIRST10 gives 10% off a frame + lens combo (up to ₹750).
 - Prescriptions: you may explain what SPH, CYL, AXIS, ADD and PD mean and which lens type fits (single vision, bifocal, progressive, zero power), and that higher powers need thinner high-index lenses. Never diagnose, never suggest a power, and never give medical advice; for eye problems, pain, sudden vision changes or a new prescription, tell them to see an optometrist or eye doctor. Our optician checks every prescription before lenses are made.
@@ -102,24 +106,136 @@ async function askGemini(system: string, history: ChatMessage[]): Promise<string
   return text;
 }
 
-/** Simple answers when no AI key is set (or the AI is unavailable). */
-function basicAnswer(q: string, c: Awaited<ReturnType<typeof buildContext>>): string {
-  const t = q.toLowerCase();
-  if (/\b(my order|orders?|track(ing)?|where is|deliver(y|ed)?|status|shipped|dispatch(ed)?|arriv(e|ing))\b/.test(t)) {
-    if (!c.signedIn) return 'Sign in to see your orders here. You can also open Orders in the app for live tracking, or chat with us on WhatsApp with your order number. [HANDOFF]';
-    return c.orderText ? `Here are your latest orders:\n${c.orderText.replace(/^- /gm, '• ')}` : "You don't have any orders yet. Browse frames in Shop to get started.";
+/** Built-in knowledge base, used when no AI key is set (or the AI is down). Short, specific answers. */
+type Ctx = Awaited<ReturnType<typeof buildContext>>;
+const LT: Record<string, string> = { SINGLE_VISION_DISTANCE: 'distance', SINGLE_VISION_READING: 'reading', BIFOCAL: 'bifocal', PROGRESSIVE: 'progressive', ZERO_POWER: 'zero power' };
+const COLOURS = ['black', 'brown', 'tortoise', 'gold', 'silver', 'blue', 'navy', 'red', 'pink', 'green', 'grey', 'gray', 'transparent', 'clear', 'purple', 'white', 'wine', 'rose'];
+const SHAPES: Record<string, string> = { round: 'ROUND', rectangle: 'RECTANGLE', rectangular: 'RECTANGLE', square: 'SQUARE', 'cat eye': 'CAT_EYE', 'cat-eye': 'CAT_EYE', cateye: 'CAT_EYE', aviator: 'AVIATOR', wayfarer: 'WAYFARER', oval: 'OVAL', geometric: 'GEOMETRIC', hexagon: 'GEOMETRIC' };
+
+/** Frame finder: "black round frames under 2000 for women" → matching frames from the catalogue. */
+function findFrames(t: string, c: Ctx) {
+  const shape = Object.entries(SHAPES).find(([k]) => t.includes(k))?.[1];
+  const colour = COLOURS.find((k) => new RegExp(`\\b${k}\\b(?!\\s*(light|cut|ray))`).test(t));
+  const max = Number((t.match(/(?:under|below|less than|within|upto|up to|max|<)\s*(?:rs\.?|₹|inr)?\s*(\d{3,6})/) || [])[1]) || null;
+  const min = Number((t.match(/(?:above|over|more than|from)\s*(?:rs\.?|₹|inr)?\s*(\d{3,6})/) || [])[1]) || null;
+  const gender = /\b(women|woman|ladies|female|girl)/.test(t) ? 'WOMEN' : /\b(men|man|gents|male|boy)\b/.test(t) ? 'MEN' : /\b(kid|kids|child|children)\b/.test(t) ? 'KIDS' : null;
+  const sun = /\bsun ?glass/.test(t) ? true : /\b(eyeglass|spectacle|specs|power glass)/.test(t) ? false : null;
+  const metal = /\bmetal|titanium\b/.test(t) ? true : /\b(acetate|plastic|tr ?90)\b/.test(t) ? false : null;
+  if (!shape && !colour && !max && !min && !gender && sun === null && metal === null) return null;
+  const list = c.products.filter((p) =>
+    (!shape || p.shape === shape) && (!max || p.basePrice <= max * 100) && (!min || p.basePrice >= min * 100)
+    && (!gender || p.gender === gender || (gender !== 'KIDS' && p.gender === 'UNISEX')) && (sun === null || p.isSunglasses === sun)
+    && (metal === null || (metal ? ['METAL', 'TITANIUM'].includes(p.material) : !['METAL', 'TITANIUM'].includes(p.material)))
+    && (!colour || p.variants.some((v) => v.stock > 0 && v.colorName.toLowerCase().includes(colour === 'gray' ? 'grey' : colour))));
+  if (gender) list.sort((a, b) => Number(b.gender === gender) - Number(a.gender === gender));   // their own first
+  const what = [colour, metal === true ? 'metal' : metal === false ? 'acetate/plastic' : null, shape && shape.toLowerCase().replace('_', '-'), sun ? 'sunglasses' : 'frames', gender && `for ${gender.toLowerCase()}`, max && `under ₹${max.toLocaleString('en-IN')}`, min && `above ₹${min.toLocaleString('en-IN')}`].filter(Boolean).join(' ');
+  if (!list.length) return `I couldn't find ${what} right now. Try removing a filter, or browse Shop for all frames.`;
+  return `${list.length > 3 ? 'Top picks' : 'Here you go'} (${what}): ${list.slice(0, 3).map((p) => `${p.name} ${rupees(p.basePrice)}`).join(', ')}. Tap one to see colours and sizes, or try it on in the Try on tab.`;
+}
+
+/** Lens advice for a power: cheapest single-vision lens that supports it. */
+function lensForPower(t: string, c: Ctx) {
+  const nums = [...t.matchAll(/([+-]?\d{1,2}(?:\.\d{1,2})?)/g)].map((m) => Math.abs(parseFloat(m[1]))).filter((n) => n > 0 && n <= 25);
+  if (!nums.length || !/\b(power|sph|minus|plus|number|eye|−|-\d|\+\d|lens)/.test(t)) return null;
+  const pw = Math.max(...nums);
+  const sv = c.lenses.filter((l) => l.lensType === 'SINGLE_VISION_DISTANCE').sort((a, b) => a.price - b.price);
+  const fit = sv.find((l) => Number(l.maxAbsSph) >= pw && (pw < 3 || Number(l.index) >= (pw >= 6 ? 1.67 : 1.6)));
+  if (fit && pw < 3) return `For a power of ${pw}, our ${fit.name} lens (${fit.price ? '+' + rupees(fit.price) : 'included with the frame'}) is ideal. Add anti-glare if you drive at night or use screens a lot. Our optician checks your prescription before making the lenses.`;
+  if (!fit) return `For a power of ${pw}, please chat with our team on WhatsApp so the optician can advise. [HANDOFF]`;
+  return `For a power around ${pw}, we suggest ${fit.name} (index ${fit.index}, ${fit.price ? '+' + rupees(fit.price) : 'included'}). ${pw >= 3 ? 'Higher-index lenses are thinner and lighter for higher powers. ' : ''}Our optician checks your prescription before making the lenses.`;
+}
+
+function basicAnswer(q: string, c: Ctx): string {
+  const t = ` ${q.toLowerCase().replace(/[?!,]|\.(?!\d)/g, ' ').replace(/\s+/g, ' ')} `;
+  const has = (re: RegExp) => re.test(t);
+  const prices = c.products.map((p) => p.basePrice);
+  const minP = prices.length ? rupees(Math.min(...prices)) : null, maxP = prices.length ? rupees(Math.max(...prices)) : null;
+  const included = c.lenses.find((l) => l.price === 0 && l.lensType === 'SINGLE_VISION_DISTANCE');
+  const paidLens = c.lenses.filter((l) => l.price > 0).sort((a, b) => a.price - b.price);
+  const coatMin = c.coatings.length ? rupees(Math.min(...c.coatings.map((x) => x.price))) : null;
+
+  // greetings and thanks
+  if (/^\s*(hi|hii+|hello|hey|namaste|namaskara|vanakkam|good (morning|evening|afternoon))\s*$/.test(t)) return 'Hi! I can help you choose frames and lenses, explain your prescription, find your size, and track orders. What are you looking for?';
+  if (/^\s*(thanks?|thank you|ok(ay)?|great|super|nice|cool)\s*$/.test(t)) return "You're welcome! Anything else I can help with?";
+
+  // orders
+  if (has(/\b(my order|orders?|track(ing)?|where is|delivered|status|shipped|dispatch(ed)?|arriv(e|ing)|cancel)\b/)) {
+    if (has(/\bcancel/)) return 'You can cancel an order before it is dispatched: open Orders, tap the order, then Cancel. Paid orders are refunded to the same UPI/account. Need help? Chat with us on WhatsApp. [HANDOFF]';
+    if (!c.signedIn) return 'Sign in to see your orders here. You can also open Orders for live tracking, or chat with us on WhatsApp with your order number. [HANDOFF]';
+    return c.orderText ? `Your latest orders:\n${c.orderText.split('\n').slice(0, 3).join('\n').replace(/^- /gm, '• ')}` : "You don't have any orders yet. Browse frames in Shop to get started.";
   }
-  if (/\b(sph|cyl|axis|add|pd|prescription|power)\b/.test(t))
-    return 'SPH is the main lens power (− for distance, + for reading). CYL and AXIS correct astigmatism. ADD is extra reading power for bifocal or progressive lenses. PD is the distance between your pupils in mm. Upload a photo of your prescription and our optician checks it before making your lenses.';
-  if (/\b(progressive|bifocal|single vision|zero power|lens|lenses|blue|coating|anti.?glare|photochromic)\b/.test(t))
-    return `Our lens options:\n${c.lensText.replace(/^- /gm, '• ').split('\n').slice(0, 6).join('\n')}\nCoatings:\n${c.coatText.replace(/^- /gm, '• ')}`;
-  if (/\b(pay(ment)?s?|paying|upi|gpay|phonepe|paytm|cod|cash)\b/.test(t)) return `You can pay by: ${c.pay || 'the options shown at checkout'}.`;
-  if (/\b(return|refund|exchange|damage|broken|complain)/.test(t)) return 'For returns, exchanges or a damaged item, please chat with our team on WhatsApp and share your order number. [HANDOFF]';
-  if (/\b(frame|suggest|recommend|face|glasses|sunglass)/.test(t)) {
-    const top = c.products.slice(0, 3).map((p) => p.name).join(', ');
-    return top ? `Popular right now: ${top}. Tap a frame to see colours and sizes, or use the Try on tab to see it on your face.` : 'Our frames are being added. Check back soon!';
+  // returns, refunds, complaints
+  if (has(/\b(return|refund|exchange|replace(ment)?|damage[d]?|broken|scratch(ed)?|wrong|complain|warranty|guarantee)/))
+    return `${c.shopInfo ? c.shopInfo.split('\n')[0] + ' ' : ''}For returns, exchanges, warranty or a damaged item, please chat with our team on WhatsApp with your order number and a photo. [HANDOFF]`;
+  // payment before delivery ("cash on delivery")
+  if (has(/\b(cod|cash on delivery|cash)\b/)) return `Cash on Delivery isn't available. You can pay by ${c.pay}.`;
+  if (has(/\bcontact lens/)) return "We don't sell contact lenses at the moment, only frames with prescription lenses and sunglasses. For contact lenses, please consult your eye doctor.";
+  if (has(/\b(pd|pupil(lary)? distance)\b/) && !has(/\b(sph|cyl)\b/))
+    return 'PD (pupillary distance) is the distance between the centres of your pupils, usually 54-74 mm for adults. It is often on your prescription. You can also measure it with the AI face scan in the Try on tab (about ±2 mm).';
+  if (has(/\b(face shape|(round|square|oval|heart|long|my) face|suit(s)? me|which (frame|shape))\b/))
+    return 'Round face: rectangle, square or wayfarer frames. Square face: round, oval, cat-eye or aviator. Oval: almost any shape. Heart: aviator, round or bottom-heavy frames. Long: deep, bold frames. The ✨ AI face scan in Try on tells you your face shape and recommends frames.';
+  if (has(/\b(zero power|no power|without power|plain|computer glasses?|blue ?(light|cut)|screen)\b/)) { const b = c.coatings.find((x) => /blue/i.test(x.name)); return `For screen use without power, choose a zero-power lens${b ? ` with ${b.name} (+${rupees(b.price)})` : ' with a blue-cut coating'}. If you have a power, add blue cut to your normal lens. Take screen breaks too: every 20 minutes, look 20 feet away for 20 seconds.`; }
+  // frame finder
+  const found = findFrames(t, c); if (found && !has(/\b(how|what is|why)\b/)) return found;
+  // lens for a power
+  const lp = lensForPower(t, c); if (lp) return lp;
+  // cost / price
+  if (has(/\b(cost|price|prices|rate|charges?|how much|expensive|cheap|budget|kitna|amount|total)\b/))
+    return `Your total = frame + lenses + any coatings. Frames: ${minP && maxP ? `${minP} to ${maxP}` : 'see Shop'}. Lenses: ${included ? `${included.name} included` : 'priced by type'}${paidLens.length ? `, thinner/other lenses from +${rupees(paidLens[0].price)}` : ''}. Coatings ${coatMin ? `from +${coatMin}` : 'optional'}. New customers: code FIRST10 gives 10% off a frame + lens combo.`;
+  // delivery
+  if (has(/\b(delivery|shipping|ship|courier|how (many|long) days|when will|days)\b/))
+    return 'Delivery is free above ₹999 (otherwise ₹99). Prescription glasses usually take 5-8 days: our lab cuts and checks your lenses, then the courier delivers. You get WhatsApp/email updates at each step and can track it in Orders.';
+  // payment
+  if (has(/\b(pay(ment)?s?|paying|upi|gpay|google pay|phonepe|paytm|card|cod|cash|emi)\b/)) {
+    if (has(/\b(cod|cash)\b/)) return `Cash on Delivery isn't available. You can pay by ${c.pay}.`;
+    return `You can pay by ${c.pay}.`;
   }
-  return 'I can help with frames, lenses, coatings, prescriptions, payment and your orders. For anything else, chat with our team on WhatsApp. [HANDOFF]';
+  // prescription words
+  if (has(/\b(sph|cyl|axis|add|prescription|rx|spectacle power|eye power)\b/) || has(/\bwhat is pd\b/))
+    return 'SPH is your main lens power (− for distance, + for reading). CYL and AXIS correct astigmatism. ADD is extra reading power for bifocal/progressive lenses. PD is the distance between your pupils in mm. Upload a photo of your prescription; our optician checks it before making your lenses.';
+  if (has(/\b(pd|pupil(lary)? distance)\b/))
+    return 'PD (pupillary distance) is the distance between the centres of your pupils, usually 54-74 mm for adults. It is often on your prescription. You can also measure it with the AI face scan in the Try on tab (about ±2 mm).';
+  // size / measurement / face scan
+  if (has(/\b(size|fit|fitting|measure|measurement|width|small|medium|large|wide|face scan|scan)\b/))
+    return 'Find your size in the Try on tab: tap ✨ AI face scan (voice-guided) for your face width, PD and size, or for an exact size enter the numbers printed inside your current glasses (like 52□18-140). Small fits frames under 132 mm wide, Medium 132-140 mm, Wide over 140 mm.';
+  // face shape
+  if (has(/\b(face shape|round face|square face|oval face|heart|long face|suit me|suits me|which (frame|shape))\b/))
+    return 'Round face: rectangle, square or wayfarer frames. Square face: round, oval, cat-eye or aviator. Oval: almost any shape. Heart: aviator, round or bottom-heavy frames. Long: deep, bold frames. The AI face scan in Try on tells you your face shape and recommends frames.';
+  // try-on
+  if (has(/\b(try ?on|virtual|camera|selfie|ar)\b/))
+    return 'Open the Try on tab, turn on the camera or upload a photo from your gallery, and pick frames to see them on your face. Tap Capture to save a photo or compare 4 frames side by side.';
+  // lens types and coatings
+  if (has(/\bprogressive|varifocal|multifocal\b/)) { const l = c.lenses.find((x) => x.lensType === 'PROGRESSIVE'); return `Progressive lenses give distance, computer and reading zones in one lens with no visible line, good if you have an ADD power.${l ? ` From ${l.price ? '+' + rupees(l.price) : 'included'} (${l.name}).` : ''} It takes a few days to get used to them.`; }
+  if (has(/\bbifocal\b/)) { const l = c.lenses.find((x) => x.lensType === 'BIFOCAL'); return `Bifocal lenses have a distance part on top and a reading part below, with a visible line.${l ? ` From ${l.price ? '+' + rupees(l.price) : 'included'}.` : ''} Progressive lenses do the same without a line.`; }
+  if (has(/\b(zero power|no power|without power|plain|computer glasses?|blue ?(light|cut)|screen)\b/)) { const b = c.coatings.find((x) => /blue/i.test(x.name)); return `For screen use without power, choose a zero-power lens${b ? ` with ${b.name} (+${rupees(b.price)})` : ' with a blue-cut coating'}. It reduces glare from screens; take regular breaks too (20-20-20: every 20 minutes look 20 feet away for 20 seconds).`; }
+  if (has(/\b(photochromic|transition|darken|tint)\b/)) { const pc = c.coatings.find((x) => /photo/i.test(x.name)); return `Photochromic lenses darken in sunlight and turn clear indoors${pc ? ` (+${rupees(pc.price)})` : ''}, so you don't need separate sunglasses.`; }
+  if (has(/\b(anti ?(glare|reflective)|arc|hydrophobic|smudge|coating|coatings)\b/))
+    return `Coatings (optional): ${c.coatings.slice(0, 4).map((x) => `${x.name} +${rupees(x.price)}`).join(', ')}. Anti-glare is the most useful for driving at night and screens.`;
+  if (has(/\b(lens|lenses|thin|thick|index|high power)\b/)) {
+    const sv = c.lenses.filter((l) => l.lensType === 'SINGLE_VISION_DISTANCE').slice(0, 3);
+    return `Lens options: ${sv.map((l) => `${l.name} ${l.price ? '+' + rupees(l.price) : '(included)'}`).join(', ')}. Higher index = thinner for high power. Also available: reading, bifocal, progressive and zero power. Tell me your power and I'll suggest one.`;
+  }
+  // contact lenses, eye care
+  if (has(/\bcontact lens/)) return "We don't sell contact lenses at the moment, only frames with prescription lenses and sunglasses.";
+  if (has(/\b(eye test|eye check|checkup|optometrist|doctor|home visit)\b/)) return 'Book a free eye test at home: Account → Eye test at home. An optometrist visits, checks your eyes and gives your prescription. For pain, redness or sudden vision changes, please see an eye doctor right away.';
+  if (has(/\b(pain|headache|red eye|itch|blur(red|ry)?|watering|infection)\b/)) return "I can't give medical advice. For eye pain, redness, headaches or blurred vision, please see an optometrist or eye doctor. You can also book an eye test at home in Account.";
+  if (has(/\b(clean|care|scratch proof|maintain)\b/)) return 'Clean lenses with lukewarm water and a drop of mild soap, then dry with a microfibre cloth. Avoid tissues and shirts (they scratch). Store glasses in the case, lenses facing up.';
+  // shop info
+  if (has(/\b(store|shop|address|location|near me|visit|timing|open|hours)\b/)) return c.shopInfo ? `${c.shopInfo.split('\n').slice(0, 2).join(' ')} You can also see our stores in Account → Find a store.` : 'See our stores in Account → Find a store, or chat with us on WhatsApp for directions. [HANDOFF]';
+  if (has(/\b(contact|call|phone|whatsapp|support|help|talk|human|agent)\b/)) return 'Chat with our team on WhatsApp: tap the WhatsApp button below. [HANDOFF]';
+  // offers
+  if (has(/\b(offers?|discounts?|coupons?|codes?|sales?|deals?|first10)\b/)) return 'New customers: code FIRST10 gives 10% off a frame + lens combo (up to ₹750). You also earn Lensio Rewards points on every order, and frames show their current discount in Shop.';
+  if (has(/\b(reward|points|gift ?card)\b/)) return 'You earn Lensio Rewards points on every order and for reviews, and can redeem them at checkout. Gift cards can be bought and used in Account → Lensio Rewards.';
+  // account and app
+  if (has(/\b(login|log in|sign ?in|otp|password|account|register|sign ?up)\b/)) return 'Sign in with your email (password or a 6-digit code) or with your mobile number. New here? Tap Create account and add your name and mobile number. Forgot your password? Use "Email me a code".';
+  if (has(/\b(app|apk|download|update|install|android|iphone|ios)\b/)) return 'Android: download the app from lensio-api.onrender.com/download; updates come inside the app. iPhone: open Lensio in Safari and tap Share → Add to Home Screen.';
+  if (has(/\b(wishlist|save|favourite|favorite|compare)\b/)) return 'Tap ♥ on any frame to save it to your wishlist (Account → My wishlist). Tap ⇄ on up to 3 frames, then Compare, to see them side by side.';
+  // frames in general
+  if (has(/\b(frame|frames|glasses|spectacles|specs|sunglass|eyewear|recommend|suggest|best|popular|new)\b/)) {
+    const top = c.products.slice(0, 3).map((p) => `${p.name} ${rupees(p.basePrice)}`).join(', ');
+    return top ? `Popular right now: ${top}. Tell me a shape, colour or budget (e.g. "black round under 2000") and I'll find frames for you.` : 'Our frames are being added. Check back soon!';
+  }
+  return 'I can help with frames, lens types and prices, your prescription, frame size and face shape, delivery, payment and your orders. Try asking "lens for -3.5 power" or "black frames under 2000". For anything else, chat with our team on WhatsApp. [HANDOFF]';
 }
 
 export async function chat(history: ChatMessage[], userId: string | null): Promise<ChatReply> {

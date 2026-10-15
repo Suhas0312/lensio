@@ -92,3 +92,28 @@ describe('delivery estimate', () => {
     expect(e!.date.getTime()).toBeGreaterThan(Date.now());
   });
 });
+
+describe('built-in answers (no AI key)', () => {
+  const ask = async (q: string) => (await chat([{ role: 'user', text: q }], null)).reply;
+  it('answers one-word "Cost" with the real price breakdown', async () => {
+    const a = await ask('Cost');
+    expect(a).toMatch(/frame \+ lenses/); expect(a).toContain('₹1,799');
+  });
+  it('reads decimal powers correctly', async () => {
+    expect(await ask('my power is -3.5 which lens')).toMatch(/3\.5/);
+    expect(await ask('power +1.25')).toMatch(/1\.25/);
+  });
+  it('says Cash on Delivery is not available and offers UPI', async () => {
+    const a = await ask('cash on delivery');
+    expect(a).toMatch(/isn't available/); expect(a).toMatch(/UPI/);
+  });
+  it('finds frames from a description', async () => {
+    const r = await chat([{ role: 'user', text: 'black frames under 2000' }], null);
+    expect(r.products.map((p) => p.slug)).toEqual(['vista']);
+  });
+  it('explains PD and blue-cut separately', async () => {
+    expect(await ask('what is PD')).toMatch(/pupils/);
+    expect(await ask('blue light glasses')).toMatch(/zero-power/);
+  });
+});
+

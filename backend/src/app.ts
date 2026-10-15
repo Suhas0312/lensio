@@ -86,7 +86,7 @@ export function createApp() {
         loyalty: { enabled: s.loyaltyEnabled, pointsPer100: s.loyaltyPointsPer100, maxRedeemPercent: s.loyaltyMaxRedeemPercent, pointValueRupees: 1 },
         firstOrderCoupon: 'FIRST10',
         assistantAi: !!env.GEMINI_API_KEY,
-        version: '3.0.0',
+        version: '3.0.1',
       });
     } catch (e) { next(e); }
   });

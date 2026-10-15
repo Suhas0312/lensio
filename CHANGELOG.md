@@ -5,6 +5,11 @@ Server versions are shown in `/v1/config` and the admin header. App versions are
 ## Server 2.0.11
 - **Automatic app releases:** Lensio reads the newest GitHub release (tag like v2.0.2, .apk attached, not a pre-release) of the repo in the APK link (or Admin → Settings → GitHub repo). Within 5 minutes the download page, `/download/lensio.apk` and the customers' update window switch to it, with the release notes as “What's new”. No admin step. Admin settings show “Automatic ✓ v2.0.1” or what to fix; manual fields remain as fallback. Optional `GITHUB_TOKEN` env raises GitHub's rate limit.
 
+## Server 3.0.1 · Ask Lensio
+- **Fixed “Check the highlighted fields”:** after a long answer, every next question was rejected (the app sends the whole chat back and long replies were over the limit). Long history is now trimmed instead. Tested through the real route.
+- **Built-in knowledge base** (works without an AI key): short, specific answers for cost, lenses for a given power (e.g. −3.5 → Thin 1.60), progressive/bifocal/zero power/blue cut/photochromic/coatings, SPH/CYL/PD, frame size and AI face scan, face shapes, try-on, delivery, UPI payment (COD not available), orders, cancel, returns (WhatsApp), offers, rewards, eye test, eye-care basics, cleaning, contact lenses, sign-in, app download/update, wishlist/compare, stores. Frame finder: “black round frames under 2000 for women”.
+- AI mode (Gemini) instructed to answer every Lensio and eyewear question briefly, no long lists; COD removed from its payment info.
+
 ## 3.0.0 · Server + Android app + website
 - **AI face scan & style advisor (try-on):** one voice-guided 3D scan gives face shape (from 478 face points), face width, PD and frame size, the best and “go easy on” frame shapes with reasons, and recommended frames that suit and fit (tap to try on).
 - **New look:** glass-style cards everywhere, animated AI-face-scan banner and feature tiles on Home, sliding screen transitions, press feedback on frame cards.

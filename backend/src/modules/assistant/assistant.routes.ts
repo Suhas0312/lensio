@@ -16,8 +16,9 @@ const perDay = rateLimit({ windowMs: 24 * 3600_000, limit: 150, standardHeaders:
   message: { error: { code: 'DAILY_LIMIT', message: 'You have reached today\'s chat limit. Chat with us on WhatsApp instead.' } } });
 
 r.post('/chat', perMinute, perDay, optionalAuth, validate(z.object({
-  messages: z.array(z.object({ role: z.enum(['user', 'assistant']), text: z.string().trim().min(1).max(1000) }))
-    .min(1).max(20).refine((m) => m[m.length - 1].role === 'user', 'The last message must be from the customer'),
+  // Earlier replies can be long: trim instead of rejecting (the app sends the whole chat back each time).
+  messages: z.array(z.object({ role: z.enum(['user', 'assistant']), text: z.string().trim().min(1).max(20000).transform((t) => t.slice(0, 1500)) }))
+    .min(1).max(60).refine((m) => m[m.length - 1].role === 'user', 'The last message must be from the customer'),
 })), ah(async (req, res) => {
   const history = req.body.messages.slice(-12); // recent context is enough and keeps requests small
   const out = await chat(history, req.user?.id ?? null);
