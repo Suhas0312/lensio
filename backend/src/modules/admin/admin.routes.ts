@@ -374,10 +374,13 @@ r.get('/import/template/:kind', adminOnly, ah(async (req, res) => {
   if (!TEMPLATES[kind]) throw badRequest('BAD_KIND', 'Choose frames, lenses or coatings');
   res.set({ 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="lensio-${kind}-template.csv"` }).send('\uFEFF' + TEMPLATES[kind]);
 }));
-r.post('/import/:kind', adminOnly, validate(z.object({ csv: z.string().min(1).max(15_000_000), dryRun: z.boolean().default(true) })), ah(async (req, res) => {
+r.post('/import/:kind', adminOnly, validate(z.object({
+  csv: z.string().min(1).max(15_000_000), dryRun: z.boolean().default(true),
+  showAll: z.boolean().optional(), defaultStock: z.number().int().min(0).max(100000).optional(),
+})), ah(async (req, res) => {
   const kind = req.params.kind as Kind;
   if (!TEMPLATES[kind]) throw badRequest('BAD_KIND', 'Choose frames, lenses or coatings');
-  res.json(await importCatalog(kind, req.body.csv, req.body.dryRun));
+  res.json(await importCatalog(kind, req.body.csv, req.body.dryRun, { showAll: req.body.showAll, defaultStock: req.body.defaultStock }));
 }));
 /** What customers get right now: the automatic GitHub release (or the admin fallback), for the settings page. */
 r.get('/app-release', adminOnly, ah(async (_req, res) => { res.json(await androidRelease()); }));

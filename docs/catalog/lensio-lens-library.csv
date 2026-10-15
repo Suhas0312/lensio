@@ -1,0 +1,15 @@
+code,name,type,index,price,max_sph,max_cyl,description,active
+ZP-STD,Zero power — clear,zero power,1.56,0,0,0,"Clear lenses with no power, for style or protection.",yes
+ZP-PC,Zero power — polycarbonate,zero power,1.59,500,0,0,"Impact-resistant, light zero-power lens for kids and sports.",yes
+SVD-156,Everyday 1.56,single vision,1.56,0,4,2,"Standard thickness, great for low power (up to ±4).",yes
+SVD-159,Polycarbonate 1.59,single vision,1.59,1200,8,4,Impact-resistant and light. Recommended for kids and sports.,yes
+SVD-160,Thin 1.60,single vision,1.60,1500,8,4,20% thinner. Recommended above ±3.,yes
+SVD-167,Ultra thin 1.67,single vision,1.67,3500,12,6,"For high power, up to ±12.",yes
+SVD-174,Thinnest 1.74,single vision,1.74,6500,20,6,"For very high power, up to ±20.",yes
+SVR-156,Reading 1.56,reading,1.56,0,4,2,For books and phones.,yes
+SVR-160,Reading thin 1.60,reading,1.60,1500,8,4,Thinner reading lens.,yes
+BF-156,Bifocal D-top 1.56,bifocal,1.56,1800,6,3,"Distance and reading, with a visible D-shaped segment.",yes
+BF-156K,Bifocal Kryptok 1.56,bifocal,1.56,1500,6,3,"Distance and reading, with a round blended segment.",yes
+PG-156,Progressive standard,progressive,1.56,3500,6,3,"Smooth vision at all distances, no line.",yes
+PG-160W,Progressive wide-view 1.60,progressive,1.60,6500,8,4,"Wider reading and computer zones, easier to adapt.",yes
+PG-167,Progressive ultra thin 1.67,progressive,1.67,9500,10,4,Thin progressive for higher powers.,yes

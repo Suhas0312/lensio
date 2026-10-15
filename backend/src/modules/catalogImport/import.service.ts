@@ -7,6 +7,7 @@ import { prisma } from '../../lib/prisma';
  */
 export type Kind = 'frames' | 'lenses' | 'coatings';
 export interface RowError { row: number; message: string }
+export interface ImportOptions { showAll?: boolean; defaultStock?: number }
 export interface ImportResult { kind: Kind; rows: number; created: number; updated: number; skipped: number; errors: RowError[]; dryRun: boolean }
 
 // ---------- CSV ----------
@@ -54,6 +55,8 @@ const LENS_TYPES: Record<string, LensType> = {
   single_vision: 'SINGLE_VISION_DISTANCE', single_vision_distance: 'SINGLE_VISION_DISTANCE', distance: 'SINGLE_VISION_DISTANCE', sv: 'SINGLE_VISION_DISTANCE', single_vision_reading: 'SINGLE_VISION_READING', reading: 'SINGLE_VISION_READING',
   bifocal: 'BIFOCAL', kryptok: 'BIFOCAL', d_bifocal: 'BIFOCAL', progressive: 'PROGRESSIVE', varifocal: 'PROGRESSIVE', multifocal: 'PROGRESSIVE', zero_power: 'ZERO_POWER', zero: 'ZERO_POWER', plano: 'ZERO_POWER', no_power: 'ZERO_POWER', computer: 'ZERO_POWER',
 };
+/** A code written in the sheet is used as it is (e.g. SVD-156, ARC); otherwise one is made from the name. */
+const codeOf = (code: string, name: string) => (code ? code.trim().toUpperCase().replace(/\s+/g, '_') : slugify(name).toUpperCase().replace(/-/g, '_')).slice(0, 48);
 const key = (v: string) => v.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
 const SIZES: Record<string, FrameSize> = { s: 'SMALL', small: 'SMALL', narrow: 'SMALL', m: 'MEDIUM', medium: 'MEDIUM', regular: 'MEDIUM', l: 'WIDE', large: 'WIDE', wide: 'WIDE', xl: 'WIDE', extra_wide: 'WIDE' };
 export const sizeFromWidth = (w: number): FrameSize => (w < 132 ? 'SMALL' : w <= 140 ? 'MEDIUM' : 'WIDE');
@@ -111,12 +114,16 @@ function readFrame(r: Record<string, string>, row: number): FrameRow | RowError 
   };
 }
 
-async function importFrames(rows: Record<string, string>[], dryRun: boolean): Promise<ImportResult> {
+async function importFrames(rows: Record<string, string>[], dryRun: boolean, opts: ImportOptions = {}): Promise<ImportResult> {
   const res: ImportResult = { kind: 'frames', rows: rows.length, created: 0, updated: 0, skipped: 0, errors: [], dryRun };
   const groups = new Map<string, FrameRow[]>();
   rows.forEach((r, i) => {
     const x = readFrame(r, i + 2);
     if ('message' in x) { res.errors.push(x); res.skipped++; return; }
+    // "Show to customers right away": publish every frame, and give rows without stock the chosen starting stock.
+    if (opts.showAll) x.product.isActive = true;
+    if (opts.defaultStock && x.variant.stock === 0 && !pick(r, 'stock', 'qty', 'quantity')) x.variant.stock = opts.defaultStock;
+    if (opts.defaultStock && x.variant.stock === 0 && opts.showAll) x.variant.stock = opts.defaultStock;
     groups.set(x.slug, [...(groups.get(x.slug) ?? []), x]);
   });
   const existing = new Set((await prisma.product.findMany({ where: { slug: { in: [...groups.keys()] } }, select: { slug: true } })).map((p) => p.slug));
@@ -155,7 +162,7 @@ async function importLenses(rows: Record<string, string>[], dryRun: boolean): Pr
       : !(index >= 1.4 && index <= 1.9) ? 'index should be like 1.50, 1.56, 1.60, 1.67, 1.74' : !(price >= 0) ? 'price is missing (0 = included)'
       : !(Math.abs(sph) <= 30) ? 'max_sph should be the highest power supported, e.g. 6' : null;
     if (err) { res.errors.push({ row, message: err }); res.skipped++; return; }
-    items.push({ row, code: (pick(r, 'code') || slugify(name)).toUpperCase().replace(/-/g, '_').slice(0, 48), data: {
+    items.push({ row, code: codeOf(pick(r, 'code'), name), data: {
       name, lensType, index: new Prisma.Decimal(index.toFixed(2)), price, description: pick(r, 'description', 'details') || name,
       maxAbsSph: new Prisma.Decimal(Math.abs(sph || 0).toFixed(2)), maxAbsCyl: new Prisma.Decimal(Math.abs(cyl || 0).toFixed(2)),
       isActive: yes(pick(r, 'active'), true), sortOrder: Math.round(num(pick(r, 'sort', 'sort_order')) || 0),
@@ -176,7 +183,7 @@ async function importCoatings(rows: Record<string, string>[], dryRun: boolean): 
   rows.forEach((r, i) => {
     const name = pick(r, 'name', 'coating'), price = money(pick(r, 'price'));
     if (!name || !(price >= 0)) { res.errors.push({ row: i + 2, message: !name ? 'name is missing' : 'price is missing (0 = free)' }); res.skipped++; return; }
-    items.push({ code: (pick(r, 'code') || slugify(name)).toUpperCase().replace(/-/g, '_').slice(0, 48), data: { name, price, description: pick(r, 'description') || name, isActive: yes(pick(r, 'active'), true), sortOrder: Math.round(num(pick(r, 'sort')) || 0) } });
+    items.push({ code: codeOf(pick(r, 'code'), name), data: { name, price, description: pick(r, 'description') || name, isActive: yes(pick(r, 'active'), true), sortOrder: Math.round(num(pick(r, 'sort')) || 0) } });
   });
   const existing = new Set((await prisma.coating.findMany({ where: { code: { in: items.map((x) => x.code) } }, select: { code: true } })).map((x) => x.code));
   for (const x of items) {
@@ -187,11 +194,11 @@ async function importCoatings(rows: Record<string, string>[], dryRun: boolean): 
 }
 
 export const MAX_ROWS = 20000;
-export async function importCatalog(kind: Kind, csv: string, dryRun: boolean): Promise<ImportResult> {
+export async function importCatalog(kind: Kind, csv: string, dryRun: boolean, opts: ImportOptions = {}): Promise<ImportResult> {
   const rows = parseCsv(csv);
   if (!rows.length) return { kind, rows: 0, created: 0, updated: 0, skipped: 0, errors: [{ row: 1, message: 'The file is empty or has no header row.' }], dryRun };
   if (rows.length > MAX_ROWS) return { kind, rows: rows.length, created: 0, updated: 0, skipped: rows.length, errors: [{ row: 1, message: `Too many rows (${rows.length}). Split the file into parts of ${MAX_ROWS} rows.` }], dryRun };
-  const out = kind === 'frames' ? await importFrames(rows, dryRun) : kind === 'lenses' ? await importLenses(rows, dryRun) : await importCoatings(rows, dryRun);
+  const out = kind === 'frames' ? await importFrames(rows, dryRun, opts) : kind === 'lenses' ? await importLenses(rows, dryRun) : await importCoatings(rows, dryRun);
   out.errors = out.errors.slice(0, 200);
   return out;
 }

@@ -645,6 +645,10 @@
         <br><b>2.</b> Save as <b>CSV</b> (Excel: File → Save As → “CSV UTF-8”; Google Sheets: File → Download → CSV).
         <br><b>3.</b> Choose the file, tap <b>Check file</b>, fix any rows it lists, then <b>Import</b>. Importing the same file again updates prices and stock (no duplicates).</p>
         <input type="file" id="impFile" accept=".csv,text/csv" style="margin:8px 0">
+        ${im.kind === 'frames' ? `<div class="small" style="margin:4px 0 10px;display:flex;flex-direction:column;gap:6px">
+          <label class="check"><input type="checkbox" id="impShow" ${im.showAll ? 'checked' : ''}> <span><b>Show these frames to customers right away</b> (otherwise rows with active = no stay hidden until you switch them on)</span></label>
+          <label>Starting stock for each colour that has no stock in the file <input id="impStock" type="number" min="0" max="100000" value="${esc(String(im.stock ?? 5))}" style="max-width:90px"></label>
+        </div>` : ''}
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn" data-act="impCheck" ${im.csv && !im.busy ? '' : 'disabled'}>Check file</button>
           <button class="btn p" data-act="impRun" ${im.csv && r && r.dryRun && !im.busy ? '' : 'disabled'}>Import ${r && r.dryRun ? (r.created + r.updated) + ' ' + label : ''}</button>
@@ -851,7 +855,11 @@
       }
       if (act === 'impCheck' || act === 'impRun') {
         S.imp.busy = true; render();
-        try { S.imp.result = await api('/admin/import/' + S.imp.kind, { body: { csv: S.imp.csv, dryRun: act === 'impCheck' } }); if (act === 'impRun') { S.data.products = null; toast('Import finished'); } }
+        const show = $('#impShow'), stk = $('#impStock');
+        if (show) S.imp.showAll = show.checked;
+        if (stk) S.imp.stock = Math.max(0, Math.round(Number(stk.value) || 0));
+        const opts = S.imp.kind === 'frames' ? { showAll: !!S.imp.showAll, defaultStock: S.imp.stock || undefined } : {};
+        try { S.imp.result = await api('/admin/import/' + S.imp.kind, { body: { csv: S.imp.csv, dryRun: act === 'impCheck', ...opts } }); if (act === 'impRun') { S.data.products = null; toast('Import finished'); } }
         catch (e) { toast(e.message); }
         S.imp.busy = false; return render();
       }

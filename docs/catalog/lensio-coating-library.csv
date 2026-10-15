@@ -1,0 +1,12 @@
+code,name,price,description,active
+ARC,Anti-reflective,500,Cuts glare from headlights and screens. Looks clearer in photos.,yes
+BLUE_CUT,Blue cut,1000,Filters blue light from screens. Includes anti-reflective.,yes
+HYDROPHOBIC,Water & smudge repellent,400,Hydrophobic and oleophobic layer. Wipes clean easily.,yes
+PHOTOCHROMIC,Photochromic,2000,"Darkens in sunlight, clear indoors.",yes
+PHOTO_BLUE,Photochromic + blue cut,2500,Darkens in sunlight and filters screen blue light.,yes
+HARD_COAT,Scratch-resistant hard coat,300,Extra hard layer that resists everyday scratches.,yes
+UV400,UV400 protection,300,Blocks 100% of UVA and UVB rays.,yes
+POLARISED,Polarised (sunglasses),1500,"Cuts glare from roads, water and glass. For sunglasses with or without power.",yes
+TINT,Colour tint,600,"Fashion tint in grey, brown, green, blue or pink (choose in the order note).",yes
+MIRROR,Mirror coat,800,Reflective mirror finish for sunglasses.,yes
+DRIVE,Night drive,900,Reduces headlight glare and improves contrast for night driving.,yes

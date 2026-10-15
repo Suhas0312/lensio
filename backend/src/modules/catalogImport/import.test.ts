@@ -58,3 +58,34 @@ describe('lenses and coatings import', () => {
     expect(await importCatalog('coatings', TEMPLATES.coatings, false)).toMatchObject({ created: 2, errors: [] });
   });
 });
+
+describe('library files and options', () => {
+  it('keeps codes written in the sheet (SVD-156 updates the existing lens, no duplicate)', async () => {
+    db.lenses.set('SVD-156', { name: 'old' });
+    const csv = 'code,name,type,index,price,max_sph,max_cyl\nSVD-156,Everyday 1.56,single vision,1.56,0,4,2\n';
+    const r = await importCatalog('lenses', csv, false);
+    expect(r).toMatchObject({ created: 0, updated: 1 });
+    expect([...db.lenses.keys()]).toEqual(['SVD-156']);
+  });
+  it('imports the lens and coating library files with no errors', async () => {
+    const fs = await import('fs');
+    const l = await importCatalog('lenses', fs.readFileSync('../docs/catalog/lensio-lens-library.csv', 'utf8'), false);
+    const c = await importCatalog('coatings', fs.readFileSync('../docs/catalog/lensio-coating-library.csv', 'utf8'), false);
+    expect(l).toMatchObject({ rows: 14, created: 14, errors: [] });
+    expect(c).toMatchObject({ rows: 11, created: 11, errors: [] });
+    expect(db.lenses.get('PG-167')).toMatchObject({ lensType: 'PROGRESSIVE', price: 950000 });
+    expect(db.coatings.has('POLARISED')).toBe(true);
+  });
+  it('"Show to customers right away" publishes the whole frame library with a starting stock', async () => {
+    const fs = await import('fs');
+    const r = await importCatalog('frames', fs.readFileSync('../docs/catalog/lensio-design-library.csv', 'utf8'), false, { showAll: true, defaultStock: 5 });
+    expect(r).toMatchObject({ rows: 1545, created: 309, errors: [] });
+    expect([...db.products.values()].every((p) => p.isActive)).toBe(true);
+    expect([...db.variants.values()].every((v) => v.stock === 5)).toBe(true);
+  });
+  it('without the option, library frames stay hidden', async () => {
+    const fs = await import('fs');
+    await importCatalog('frames', fs.readFileSync('../docs/catalog/lensio-design-library.csv', 'utf8'), false);
+    expect([...db.products.values()].every((p) => p.isActive === false)).toBe(true);
+  });
+});

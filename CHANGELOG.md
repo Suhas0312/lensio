@@ -11,7 +11,7 @@ Server versions are shown in `/v1/config` and the admin header. App versions are
 
 ## 3.3.0 (server update, same version)
 - **Prescription approval only for power lenses:** zero-power glasses are approved automatically and go straight to lens fitting (they used to skip fitting, or wait if “frame-only to QC” was off); frames only and plain sunglasses go to quality check; power lenses always wait for the shop. Order tracking shows the right steps. Tested.
-- **Design library:** docs/catalog/lensio-design-library.csv: 309 original generic frame designs (1,545 colour options) to import hidden and switch on the ones you stock.
+- **Libraries to import in admin:** 309 original frame designs (1,545 colour options), 14 lens options and 11 coatings (docs/catalog). Bulk import has **“Show these frames to customers right away”** with a starting stock. Lens/coating codes in the sheet are kept as written, so existing ones are updated, not duplicated (bug fixed).
 
 ## 3.3.0 · Server + Android app + website
 - **App versions only when you raise them:** the release robot builds a new app only when "version" in mobile/app.json is raised (small fixes don't create versions). Manual run can force one.
