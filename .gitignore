@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.env
+backend/uploads/
+mobile/.expo/
+mobile/ios/
+mobile/android/
+*.jks
+*.p8
+*.keystore
+play-service-account.json
