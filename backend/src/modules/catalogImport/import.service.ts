@@ -7,8 +7,21 @@ import { prisma } from '../../lib/prisma';
  */
 export type Kind = 'frames' | 'lenses' | 'coatings';
 export interface RowError { row: number; message: string }
-export interface ImportOptions { showAll?: boolean; defaultStock?: number }
-export interface ImportResult { kind: Kind; rows: number; created: number; updated: number; skipped: number; errors: RowError[]; dryRun: boolean }
+/** What to do with items that already exist: update them, add the new one as a copy ("… (2)"), or leave them. */
+export type OnExisting = 'replace' | 'both' | 'skip';
+export interface ImportOptions { showAll?: boolean; defaultStock?: number; onExisting?: OnExisting; choices?: Record<string, OnExisting> }
+export interface ExistingItem { key: string; name: string; row: number }
+export interface ImportResult {
+  kind: Kind; rows: number; created: number; updated: number; skipped: number; errors: RowError[]; dryRun: boolean;
+  existing: ExistingItem[]; copies: number;
+}
+const actionFor = (key: string, opts: ImportOptions): OnExisting => opts.choices?.[key] ?? opts.onExisting ?? 'replace';
+
+/** Next free name for "Keep both": slug-2 / CODE_2 / "Name (2)". */
+async function freeSuffix(base: string, taken: (candidate: string) => Promise<boolean>, used: Set<string>, sep: string) {
+  for (let n = 2; n < 1000; n++) { const c = `${base}${sep}${n}`; if (!used.has(c) && !(await taken(c))) { used.add(c); return n; } }
+  throw new Error('Too many copies');
+}
 
 // ---------- CSV ----------
 /** RFC-4180 CSV: quotes, commas and line breaks inside quotes, CRLF, BOM. Also accepts ; or tab separators. */
@@ -115,7 +128,8 @@ function readFrame(r: Record<string, string>, row: number): FrameRow | RowError 
 }
 
 async function importFrames(rows: Record<string, string>[], dryRun: boolean, opts: ImportOptions = {}): Promise<ImportResult> {
-  const res: ImportResult = { kind: 'frames', rows: rows.length, created: 0, updated: 0, skipped: 0, errors: [], dryRun };
+  const res: ImportResult = { kind: 'frames', rows: rows.length, created: 0, updated: 0, skipped: 0, errors: [], dryRun, existing: [], copies: 0 };
+  const usedSlugs = new Set<string>();
   const groups = new Map<string, FrameRow[]>();
   rows.forEach((r, i) => {
     const x = readFrame(r, i + 2);
@@ -127,9 +141,20 @@ async function importFrames(rows: Record<string, string>[], dryRun: boolean, opt
     groups.set(x.slug, [...(groups.get(x.slug) ?? []), x]);
   });
   const existing = new Set((await prisma.product.findMany({ where: { slug: { in: [...groups.keys()] } }, select: { slug: true } })).map((p) => p.slug));
-  for (const [slug, list] of groups) {
-    existing.has(slug) ? res.updated++ : res.created++;
-    if (dryRun) continue;
+  // Save several frames at once (6 in parallel) so large files finish well within the server's request time.
+  for (const [slug, list] of groups) if (existing.has(slug)) res.existing.push({ key: slug, name: list[0].product.name as string, row: list[0].row });
+  const save = async ([origSlug, list]: [string, FrameRow[]]) => {
+    let slug = origSlug;
+    const action = existing.has(slug) ? actionFor(slug, opts) : null;
+    if (action === 'skip') { res.skipped += list.length; return; }
+    if (action === 'both') {
+      // Keep both: the file's frame is added as a copy with its own name, link and stock codes.
+      const n = await freeSuffix(slug, async (c) => !!(await prisma.product.findUnique({ where: { slug: c }, select: { id: true } })), usedSlugs, '-');
+      slug = `${slug}-${n}`;
+      list = list.map((x) => ({ ...x, product: { ...x.product, name: `${x.product.name} (${n})` }, variant: { ...x.variant, sku: `${x.variant.sku}-${n}`.slice(0, 64) } }));
+      res.copies++; res.created++;
+    } else existing.has(slug) ? res.updated++ : res.created++;
+    if (dryRun) return;
     const base = list[0];
     try {
       await prisma.$transaction(async (tx) => {
@@ -140,18 +165,21 @@ async function importFrames(rows: Record<string, string>[], dryRun: boolean, opt
         const have = new Set(p.images.map((i) => i.url));
         const add = [...new Set(list.flatMap((x) => x.images))].filter((u) => !have.has(u));
         if (add.length) await tx.productImage.createMany({ data: add.map((url, k) => ({ productId: p.id, url, sortOrder: p.images.length + k })) });
-      });
+      }, { timeout: 30_000 });
     } catch (e) {
-      existing.has(slug) ? res.updated-- : res.created--; res.skipped += list.length;
+      action === 'replace' ? res.updated-- : res.created--; if (action === 'both') res.copies--; res.skipped += list.length;
       res.errors.push({ row: base.row, message: `"${base.product.name}" could not be saved: ${(e as Error).message.split('\n').pop()?.slice(0, 120)}` });
     }
-  }
+  };
+  const queue = [...groups.entries()];
+  await Promise.all([...Array(Math.min(6, queue.length))].map(async () => { for (let g = queue.shift(); g; g = queue.shift()) await save(g); }));
+  res.errors.sort((a, b) => a.row - b.row);
   return res;
 }
 
 // ---------- lenses ----------
-async function importLenses(rows: Record<string, string>[], dryRun: boolean): Promise<ImportResult> {
-  const res: ImportResult = { kind: 'lenses', rows: rows.length, created: 0, updated: 0, skipped: 0, errors: [], dryRun };
+async function importLenses(rows: Record<string, string>[], dryRun: boolean, opts: ImportOptions = {}): Promise<ImportResult> {
+  const res: ImportResult = { kind: 'lenses', rows: rows.length, created: 0, updated: 0, skipped: 0, errors: [], dryRun, existing: [], copies: 0 };
   const items: { row: number; code: string; data: Omit<Prisma.LensPackageCreateInput, 'code'> }[] = [];
   rows.forEach((r, i) => {
     const row = i + 2, name = pick(r, 'name', 'lens_name');
@@ -169,26 +197,42 @@ async function importLenses(rows: Record<string, string>[], dryRun: boolean): Pr
     } });
   });
   const existing = new Set((await prisma.lensPackage.findMany({ where: { code: { in: items.map((x) => x.code) } }, select: { code: true } })).map((x) => x.code));
+  const used = new Set<string>();
   for (const x of items) {
-    existing.has(x.code) ? res.updated++ : res.created++;
-    if (!dryRun) await prisma.lensPackage.upsert({ where: { code: x.code }, create: { code: x.code, ...x.data }, update: x.data });
+    if (existing.has(x.code)) res.existing.push({ key: x.code, name: x.data.name as string, row: x.row });
+    const action = existing.has(x.code) ? actionFor(x.code, opts) : null;
+    if (action === 'skip') { res.skipped++; continue; }
+    let code = x.code, data = x.data;
+    if (action === 'both') {
+      const n = await freeSuffix(code, async (c) => !!(await prisma.lensPackage.findUnique({ where: { code: c }, select: { id: true } })), used, '_');
+      code = `${code}_${n}`; data = { ...data, name: `${data.name} (${n})` }; res.copies++; res.created++;
+    } else existing.has(x.code) ? res.updated++ : res.created++;
+    if (!dryRun) await prisma.lensPackage.upsert({ where: { code }, create: { code, ...data }, update: data });
   }
   return res;
 }
 
 // ---------- coatings ----------
-async function importCoatings(rows: Record<string, string>[], dryRun: boolean): Promise<ImportResult> {
-  const res: ImportResult = { kind: 'coatings', rows: rows.length, created: 0, updated: 0, skipped: 0, errors: [], dryRun };
-  const items: { code: string; data: Omit<Prisma.CoatingCreateInput, 'code'> }[] = [];
+async function importCoatings(rows: Record<string, string>[], dryRun: boolean, opts: ImportOptions = {}): Promise<ImportResult> {
+  const res: ImportResult = { kind: 'coatings', rows: rows.length, created: 0, updated: 0, skipped: 0, errors: [], dryRun, existing: [], copies: 0 };
+  const items: { row: number; code: string; data: Omit<Prisma.CoatingCreateInput, 'code'> }[] = [];
   rows.forEach((r, i) => {
     const name = pick(r, 'name', 'coating'), price = money(pick(r, 'price'));
     if (!name || !(price >= 0)) { res.errors.push({ row: i + 2, message: !name ? 'name is missing' : 'price is missing (0 = free)' }); res.skipped++; return; }
-    items.push({ code: codeOf(pick(r, 'code'), name), data: { name, price, description: pick(r, 'description') || name, isActive: yes(pick(r, 'active'), true), sortOrder: Math.round(num(pick(r, 'sort')) || 0) } });
+    items.push({ row: i + 2, code: codeOf(pick(r, 'code'), name), data: { name, price, description: pick(r, 'description') || name, isActive: yes(pick(r, 'active'), true), sortOrder: Math.round(num(pick(r, 'sort')) || 0) } });
   });
   const existing = new Set((await prisma.coating.findMany({ where: { code: { in: items.map((x) => x.code) } }, select: { code: true } })).map((x) => x.code));
+  const used = new Set<string>();
   for (const x of items) {
-    existing.has(x.code) ? res.updated++ : res.created++;
-    if (!dryRun) await prisma.coating.upsert({ where: { code: x.code }, create: { code: x.code, ...x.data }, update: x.data });
+    if (existing.has(x.code)) res.existing.push({ key: x.code, name: x.data.name as string, row: x.row });
+    const action = existing.has(x.code) ? actionFor(x.code, opts) : null;
+    if (action === 'skip') { res.skipped++; continue; }
+    let code = x.code, data = x.data;
+    if (action === 'both') {
+      const n = await freeSuffix(code, async (c) => !!(await prisma.coating.findUnique({ where: { code: c }, select: { id: true } })), used, '_');
+      code = `${code}_${n}`; data = { ...data, name: `${data.name} (${n})` }; res.copies++; res.created++;
+    } else existing.has(x.code) ? res.updated++ : res.created++;
+    if (!dryRun) await prisma.coating.upsert({ where: { code }, create: { code, ...data }, update: data });
   }
   return res;
 }
@@ -196,10 +240,11 @@ async function importCoatings(rows: Record<string, string>[], dryRun: boolean): 
 export const MAX_ROWS = 20000;
 export async function importCatalog(kind: Kind, csv: string, dryRun: boolean, opts: ImportOptions = {}): Promise<ImportResult> {
   const rows = parseCsv(csv);
-  if (!rows.length) return { kind, rows: 0, created: 0, updated: 0, skipped: 0, errors: [{ row: 1, message: 'The file is empty or has no header row.' }], dryRun };
-  if (rows.length > MAX_ROWS) return { kind, rows: rows.length, created: 0, updated: 0, skipped: rows.length, errors: [{ row: 1, message: `Too many rows (${rows.length}). Split the file into parts of ${MAX_ROWS} rows.` }], dryRun };
-  const out = kind === 'frames' ? await importFrames(rows, dryRun, opts) : kind === 'lenses' ? await importLenses(rows, dryRun) : await importCoatings(rows, dryRun);
+  if (!rows.length) return { kind, rows: 0, created: 0, updated: 0, skipped: 0, errors: [{ row: 1, message: 'The file is empty or has no header row.' }], dryRun, existing: [], copies: 0 };
+  if (rows.length > MAX_ROWS) return { kind, rows: rows.length, created: 0, updated: 0, skipped: rows.length, errors: [{ row: 1, message: `Too many rows (${rows.length}). Split the file into parts of ${MAX_ROWS} rows.` }], dryRun, existing: [], copies: 0 };
+  const out = kind === 'frames' ? await importFrames(rows, dryRun, opts) : kind === 'lenses' ? await importLenses(rows, dryRun, opts) : await importCoatings(rows, dryRun, opts);
   out.errors = out.errors.slice(0, 200);
+  out.existing.sort((a, b) => a.row - b.row);
   return out;
 }
 

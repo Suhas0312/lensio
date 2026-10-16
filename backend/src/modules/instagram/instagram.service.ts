@@ -111,6 +111,9 @@ export async function importPosts(items: ImportItem[]) {
     try {
       const m = await ig<Media>(`/${encodeURIComponent(it.id)}?fields=${encodeURIComponent('id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,children{media_type,media_url,thumbnail_url}')}`, t);
       if (await prisma.product.findFirst({ where: { instagramPostUrl: m.permalink } })) { results.push({ id: it.id, ok: false, error: 'Already imported' }); continue; }
+      if (await prisma.product.findFirst({ where: { name: { equals: it.name.slice(0, 80).trim(), mode: 'insensitive' }, brand: { equals: 'Lensio', mode: 'insensitive' } } })) {
+        results.push({ id: it.id, ok: false, error: `A frame named "${it.name}" already exists: give this one a different name` }); continue;
+      }
       const images = await copyImages(imagesOf(m));
       if (!images.length) { results.push({ id: it.id, ok: false, error: 'Could not copy the photos' }); continue; }
       const price = Math.round(it.price * 100), mrp = Math.max(price, Math.round((it.mrp || it.price) * 100));

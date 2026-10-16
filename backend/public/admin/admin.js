@@ -54,7 +54,7 @@
 
   // ---------------- Views ----------------
   function shell(inner) {
-    const tabs = [['products', 'Frames'], ['pricing', 'Lens prices'], ['orders', 'Orders'], ['rx', 'Prescriptions'], ['reviews', 'Reviews'], ['rewards', 'Rewards'], ['stores', 'Stores'], ['eyetest', 'Eye tests'], ['settings', 'Settings']];
+    const tabs = [['products', 'Frames'], ['banners', 'Banners'], ['pricing', 'Lens prices'], ['orders', 'Orders'], ['rx', 'Prescriptions'], ['reviews', 'Reviews'], ['rewards', 'Rewards'], ['stores', 'Stores'], ['eyetest', 'Eye tests'], ['settings', 'Settings']];
     return `<header><img src="wordmark.png" alt="Lensio"><nav>${tabs.map(([k, l]) => `<button data-act="nav" data-v="${k}" class="${S.view === k ? 'on' : ''}">${l}</button>`).join('')}</nav>
       <button class="link" data-act="alertsOpen" style="color:#fff;font-size:15px" aria-label="Alerts">🔔${S.alerts.unseen ? ` <span class="pill bad" style="background:#FF5C7A;color:#fff">${S.alerts.unseen}</span>` : ''}</button>
       <span class="who">${esc(S.user.email || (S.user.phone ? '+91 ' + S.user.phone : ''))} · ${tc(S.user.role)}${S.serverVersion ? ' · v' + esc(S.serverVersion) : ''}</span><button class="link" style="color:#A3A8D2" data-act="logout">Sign out</button></header><main>${inner}</main>`;
@@ -83,21 +83,69 @@
 
   // Products list
   function productsView() {
-    const list = S.data.products;
-    if (!list) return shell('<p class="muted">Loading frames…</p>');
+    const all = S.data.products;
+    if (!all) return shell('<p class="muted">Loading frames…</p>');
+    const dupKey = (p) => `${p.name.trim().toLowerCase()}|${(p.brand || '').trim().toLowerCase()}`;
+    const counts = all.reduce((m, p) => m.set(dupKey(p), (m.get(dupKey(p)) || 0) + 1), new Map());
+    const isDup = (p) => counts.get(dupKey(p)) > 1;
+    const f = S.pfilter || 'all';
+    const pf = S.pf || (S.pf = {});
+    const stockOf = (p) => p.variants.reduce((n, v) => n + v.stock, 0);
+    const list = all.filter((p) => (f === 'live' ? p.isActive : f === 'hidden' ? !p.isActive : f === 'dup' ? isDup(p) : true)
+      && (!pf.type || (pf.type === 'sun') === !!p.isSunglasses)
+      && (!pf.gender || p.gender === pf.gender)
+      && (!pf.shape || p.shape === pf.shape) && (!pf.material || p.material === pf.material)
+      && (!pf.stock || (pf.stock === 'in' ? stockOf(p) > 0 : stockOf(p) === 0))
+      && (!pf.min || p.basePrice >= pf.min * 100) && (!pf.max || p.basePrice <= pf.max * 100));
+    const opt = (k, v, label) => `<option value="${v}" ${pf[k] === v ? 'selected' : ''}>${label}</option>`;
+    const filterBar = `<div class="card" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <select data-pf="type"><option value="">All types</option>${opt('type', 'eye', 'Eyeglasses')}${opt('type', 'sun', 'Sunglasses')}</select>
+      <select data-pf="gender"><option value="">For everyone</option>${opt('gender', 'MEN', 'Men')}${opt('gender', 'WOMEN', 'Women')}${opt('gender', 'UNISEX', 'Unisex')}${opt('gender', 'KIDS', 'Kids')}</select>
+      <select data-pf="shape"><option value="">All shapes</option>${['RECTANGLE', 'ROUND', 'CAT_EYE', 'AVIATOR', 'WAYFARER', 'SQUARE', 'OVAL', 'GEOMETRIC'].map((x) => opt('shape', x, tc(x))).join('')}</select>
+      <select data-pf="material"><option value="">All materials</option>${['ACETATE', 'METAL', 'TITANIUM', 'TR90', 'MIXED'].map((x) => opt('material', x, x === 'TR90' ? 'TR90' : tc(x))).join('')}</select>
+      <select data-pf="stock"><option value="">Any stock</option>${opt('stock', 'in', 'In stock')}${opt('stock', 'out', 'Out of stock')}</select>
+      <label class="small">₹ <input data-pf="min" type="number" min="0" placeholder="min" value="${pf.min ?? ''}" style="max-width:80px"></label>
+      <label class="small">to <input data-pf="max" type="number" min="0" placeholder="max" value="${pf.max ?? ''}" style="max-width:80px"></label>
+      ${Object.values(pf).some((v) => v !== undefined && v !== '') ? '<button class="link" data-act="pfClear">Clear filters</button>' : ''}
+      <span class="small muted" style="margin-left:auto">Showing ${list.length} of ${all.length}</span></div>`;
+    const sel = S.psel || (S.psel = new Set());
     const rows = list.map((p) => {
       const stock = p.variants.reduce((s, v) => s + v.stock, 0);
       return `<tr class="click" data-act="editProduct" data-id="${p.id}">
+        <td data-act="noop"><input type="checkbox" class="psel" data-act="pselOne" data-id="${p.id}" ${sel.has(p.id) ? 'checked' : ''} aria-label="Select ${esc(p.name)}"></td>
         <td>${p.images[0] ? `<img class="thumb" src="${esc(p.images[0].url)}" alt="">` : '<div class="thumb"></div>'}</td>
-        <td><b>${esc(p.name)}</b><div class="small muted">${tc(p.shape)} · ${tc(p.material)}${p.isSunglasses ? ' · Sunglasses' : ''}</div></td>
+        <td><b>${esc(p.name)}</b>${isDup(p) ? ' <span class="pill bad">Duplicate</span>' : ''}<div class="small muted">${tc(p.shape)} · ${tc(p.material)}${p.isSunglasses ? ' · Sunglasses' : ''}</div></td>
         <td>${inr(p.basePrice)}<div class="small muted" style="text-decoration:line-through">${inr(p.mrp)}</div></td>
         <td>${p.variants.length} colour${p.variants.length > 1 ? 's' : ''}</td>
-        <td><span class="pill ${stock === 0 ? 'bad' : stock <= 5 ? 'warn' : 'ok'}">${stock} in stock</span></td>
-        <td><span class="pill ${p.isActive ? 'ok' : ''}">${p.isActive ? 'Live' : 'Hidden'}</span>${p.images.length ? '' : ' <span class="pill warn">No photos</span>'}</td></tr>`;
+        <td><button class="pill ${stock === 0 ? 'bad' : stock <= 5 ? 'warn' : 'ok'}" data-act="stockOpen" data-id="${p.id}" title="Change stock" style="border:0;cursor:pointer">${stock} in stock ✎</button></td>
+        <td><button class="pill ${p.isActive ? 'ok' : ''}" data-act="toggleLive" data-id="${p.id}" title="${p.isActive ? 'Tap to hide from customers' : 'Tap to show to customers'}" style="border:0;cursor:pointer">${p.isActive ? '● Live' : '○ Hidden'}</button>${p.images.length ? '' : ' <span class="pill warn">No photos</span>'}</td>
+        <td style="white-space:nowrap"><button class="link" data-act="editProduct" data-id="${p.id}">✎ Edit</button> <button class="link" style="color:#f87171" data-act="delProduct" data-id="${p.id}">🗑 Delete</button></td></tr>
+        ${S.stockOpen === p.id ? `<tr><td colspan="8" data-act="noop" style="background:rgba(124,58,237,.08)">
+          <div class="small" style="margin-bottom:8px"><b>Stock for each colour</b> of ${esc(p.name)}</div>
+          <div style="display:flex;flex-wrap:wrap;gap:10px">${p.variants.map((v) => `<label class="small" style="display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.04);padding:6px 10px;border-radius:10px">
+            <span style="width:14px;height:14px;border-radius:50%;background:${esc(v.colorHex)};display:inline-block;border:1px solid #444"></span>${esc(v.colorName)} · ${tc(v.size)}
+            <input type="number" min="0" class="stockIn" data-vid="${v.id}" value="${v.stock}" style="width:70px"></label>`).join('')}</div>
+          <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+            <label class="small">Set all colours to <input type="number" min="0" id="stockAll" style="width:70px"></label><button class="btn" data-act="stockAll">Apply</button>
+            <span class="grow"></span><button class="btn" data-act="stockClose">Cancel</button><button class="btn p" data-act="stockSave" data-id="${p.id}">Save stock</button>
+          </div></td></tr>` : ''}`;
     }).join('');
     return shell(`<div class="bar"><h1 class="grow">Frames</h1><input id="psearch" placeholder="Search name or SKU" style="max-width:260px" value="${esc(S.data.q || '')}"><button class="btn" data-act="nav" data-v="import">📥 Bulk import (CSV)</button><button class="btn" data-act="igOpen">📸 Import from Instagram</button><button class="btn" data-act="quickAdd">⚡ Quick add from photos</button><button class="btn p" data-act="newProduct">Add frame</button></div>
-      <div class="card">${list.length ? `<div class="tablewrap"><table><thead><tr><th></th><th>Frame</th><th>Price</th><th>Colours</th><th>Stock</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div>`
-        : `<p>No frames yet. Add frames one at a time, or pick many photos at once with Quick add.</p><div style="display:flex;gap:8px"><button class="btn" data-act="quickAdd">⚡ Quick add from photos</button><button class="btn p" data-act="newProduct">Add frame</button></div>`}</div>
+      ${all.length ? (() => {
+        const hidden = all.filter((p) => !p.isActive).length, live = all.length - hidden;
+        const dups = all.filter(isDup).length;
+        const chip = (k, label) => `<button class="btn ${f === k ? 'p' : ''}" style="padding:6px 12px" data-act="pfilter" data-v="${k}">${label}</button>`;
+        return `<div class="card" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">${chip('all', `All ${all.length}`)}${chip('live', `● Live ${live}`)}${chip('hidden', `○ Hidden ${hidden}`)}${dups ? chip('dup', `⚠ Duplicates ${dups}`) : ''}</div>
+        ${sel.size ? `<div class="card" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;border-color:#7c3aed"><b>${sel.size} selected</b>
+          <button class="btn" data-act="bulk" data-v="show">● Show</button><button class="btn" data-act="bulk" data-v="hide">○ Hide</button>
+          <label class="small">Stock per colour <input id="bulkStock" type="number" min="0" value="5" style="max-width:70px"></label><button class="btn" data-act="bulk" data-v="stock">Set stock</button>
+          <button class="btn" style="color:#f87171" data-act="bulk" data-v="delete">🗑 Delete</button><button class="link" data-act="pselNone">Clear selection</button></div>` : ''}
+        <div class="card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><span><b>${all.length}</b> frames · <span class="pill ok">${live} live</span> <span class="pill">${hidden} hidden</span></span>
+          ${hidden ? `<span class="grow"></span><label class="small">Stock for out-of-stock colours <input id="showStock" type="number" min="0" value="5" style="max-width:80px"></label><button class="btn p" data-act="showHidden">👁 Show all ${hidden} hidden frames</button>` : ''}</div>`;
+      })() : ''}
+      ${all.length ? filterBar : ''}
+      <div class="card">${list.length ? `<div class="tablewrap"><table><thead><tr><th data-act="noop"><input type="checkbox" data-act="pselAll" ${list.length && list.every((p) => sel.has(p.id)) ? 'checked' : ''} aria-label="Select all shown"></th><th></th><th>Frame</th><th>Price</th><th>Colours</th><th>Stock</th><th>Status</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`
+        : all.length ? '<p>No frames match these filters. <button class="link" data-act="pfClear">Clear filters</button></p>' : `<p>No frames yet. Add frames one at a time, or pick many photos at once with Quick add.</p><div style="display:flex;gap:8px"><button class="btn" data-act="quickAdd">⚡ Quick add from photos</button><button class="btn p" data-act="newProduct">Add frame</button></div>`}</div>
       <input type="file" id="quickInput" accept="image/jpeg,image/png,image/webp" multiple hidden>`);
   }
 
@@ -158,6 +206,15 @@
       <div class="card"><h2>Try-on image (optional)</h2><p class="muted small">Not required: the Try on page uses the <b>main photo</b> automatically and removes a white background. For the best look, upload a front-view PNG with a transparent background.${p.id ? ` <a href="/try-on/?frame=${encodeURIComponent(p.slug)}" target="_blank" rel="noopener">Preview try-on →</a>` : ''}</p>
         <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">${p.tryOnImage ? `<img src="${esc(p.tryOnImage)}" alt="Try-on image" style="height:70px;background:repeating-conic-gradient(#ddd 0 25%,#fff 0 50%) 0/16px 16px;border-radius:8px;padding:6px">` : ''}
         <button class="btn" data-act="pickTryon">${p.tryOnImage ? 'Replace PNG' : 'Upload PNG'}</button>${p.tryOnImage ? '<button class="btn danger" data-act="tryonDel">Remove</button>' : ''}</div>
+        <h3 style="margin:14px 0 4px">3D try-on model (optional)</h3>
+        <p class="small muted">Every frame already works in 3D (built from its shape, size and colour). For the most realistic look, add this frame's own 3D model: an https link to a <b>.glb</b> or <b>.gltf</b> file (e.g. uploaded to your Cloudflare R2). Front of the frame facing +Z, arms going back.</p>
+        <label>Model link (.glb / .gltf)<input data-f3="url" value="${esc(p.tryOn3d?.url || '')}" placeholder="https://…/frame.glb"></label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <label class="small">Size ×<input data-f3="scale" type="number" step="0.05" min="0.2" max="5" value="${p.tryOn3d?.scale ?? 1}" style="max-width:80px"></label>
+          <label class="small">Up/down mm<input data-f3="offsetY" type="number" step="0.5" min="-40" max="40" value="${p.tryOn3d?.offsetY ?? 0}" style="max-width:80px"></label>
+          <label class="small">Forward/back mm<input data-f3="offsetZ" type="number" step="0.5" min="-40" max="40" value="${p.tryOn3d?.offsetZ ?? 0}" style="max-width:80px"></label>
+          <label class="small">Tilt °<input data-f3="rotX" type="number" step="1" min="-45" max="45" value="${p.tryOn3d?.rotX ?? 0}" style="max-width:80px"></label>
+        </div>
         <input type="file" id="tryInput" accept="image/png,image/webp" hidden></div>
 
       <div class="err" id="perr"></div>
@@ -644,7 +701,11 @@
         <p class="small"><b>1.</b> <button class="link" data-act="impTemplate">Download the ${label} template</button>, open it in Excel or Google Sheets and fill in your ${label} (thousands of rows are fine).
         <br><b>2.</b> Save as <b>CSV</b> (Excel: File → Save As → “CSV UTF-8”; Google Sheets: File → Download → CSV).
         <br><b>3.</b> Choose the file, tap <b>Check file</b>, fix any rows it lists, then <b>Import</b>. Importing the same file again updates prices and stock (no duplicates).</p>
-        <input type="file" id="impFile" accept=".csv,text/csv" style="margin:8px 0">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:8px 0">
+          <label for="impFile" class="btn" style="cursor:pointer">📄 ${im.file ? 'Choose another file' : 'Choose CSV file'}</label>
+          <span class="small">${im.file ? '✓ <b>' + esc(im.file) + '</b>' : '<span class="muted">No file chosen yet</span>'}</span>
+          <input type="file" id="impFile" accept=".csv,text/csv" hidden>
+        </div>
         ${im.kind === 'frames' ? `<div class="small" style="margin:4px 0 10px;display:flex;flex-direction:column;gap:6px">
           <label class="check"><input type="checkbox" id="impShow" ${im.showAll ? 'checked' : ''}> <span><b>Show these frames to customers right away</b> (otherwise rows with active = no stay hidden until you switch them on)</span></label>
           <label>Starting stock for each colour that has no stock in the file <input id="impStock" type="number" min="0" max="100000" value="${esc(String(im.stock ?? 5))}" style="max-width:90px"></label>
@@ -653,13 +714,58 @@
           <button class="btn" data-act="impCheck" ${im.csv && !im.busy ? '' : 'disabled'}>Check file</button>
           <button class="btn p" data-act="impRun" ${im.csv && r && r.dryRun && !im.busy ? '' : 'disabled'}>Import ${r && r.dryRun ? (r.created + r.updated) + ' ' + label : ''}</button>
         </div>
-        ${im.file ? `<p class="small muted">File: ${esc(im.file)}</p>` : ''}
         ${im.busy ? '<p class="small">Working… large files can take a minute.</p>' : ''}
       </div>
       ${r ? `<div class="card"><h2>${r.dryRun ? 'Check result (nothing saved yet)' : 'Imported ✓'}</h2>
-        <p>${r.rows} rows · <b>${r.created}</b> new ${label} · <b>${r.updated}</b> updated · ${r.skipped} rows skipped</p>
+        <p>${r.rows} rows · <b>${r.created}</b> new ${label}${r.copies ? ` (${r.copies} kept as copies)` : ''} · <b>${r.updated}</b> updated · ${r.skipped} rows skipped</p>
+        ${r.dryRun && r.existing && r.existing.length ? `<div style="border:1px solid #f59e0b;border-radius:12px;padding:12px;margin:10px 0">
+          <p style="margin-top:0"><b>⚠ ${r.existing.length} ${label} already in your shop.</b> What should happen to them?</p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">${[['replace', 'Replace', 'update them with the file'], ['both', 'Keep both', 'add the file’s as copies “… (2)”'], ['skip', 'Skip', 'leave them as they are']].map(([v, l, h]) =>
+            `<button class="btn ${(im.onExisting || 'replace') === v ? 'p' : ''}" data-act="impMode" data-v="${v}"><b>${l}</b> <span class="small">${h}</span></button>`).join('')}</div>
+          <details style="margin-top:8px"><summary class="small">Choose for each one</summary><div style="max-height:300px;overflow:auto"><table class="small"><tr><th>Row</th><th>Name</th><th>Action</th></tr>
+          ${r.existing.slice(0, 500).map((e) => `<tr><td>${e.row}</td><td>${esc(e.name)}</td><td><select data-ch="${esc(e.key)}"><option value="">Same as above</option>${[['replace', 'Replace'], ['both', 'Keep both'], ['skip', 'Skip']].map(([v, l]) => `<option value="${v}" ${(im.choices || {})[e.key] === v ? 'selected' : ''}>${l}</option>`).join('')}</select></td></tr>`).join('')}
+          </table></div></details></div>` : ''}
         ${r.errors.length ? `<p class="small"><b>Rows to fix</b> (row numbers match your spreadsheet):</p><div style="max-height:320px;overflow:auto"><table class="small"><tr><th>Row</th><th>Problem</th></tr>${r.errors.map((e) => `<tr><td>${e.row}</td><td>${esc(e.message)}</td></tr>`).join('')}</table></div>` : '<p class="small">No problems found.</p>'}
         ${!r.dryRun ? `<p class="small"><button class="link" data-act="nav" data-v="products">See your frames →</button></p>` : ''}</div>` : ''}`);
+  }
+
+  /** Banners: the rotating carousel at the top of Home (app and website). */
+  function bannersView() {
+    const list = S.data.banners;
+    if (!list) return shell('<p class="muted">Loading banners…</p>');
+    const dt = (v) => (v ? new Date(v).toISOString().slice(0, 16) : '');
+    const card = (b, i) => `<div class="card" style="display:grid;gap:10px">
+      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start">
+        <div style="width:260px;max-width:100%;aspect-ratio:2.4;border-radius:14px;overflow:hidden;background:linear-gradient(120deg,#08B9DB,#7B61FF,#C94EF2);position:relative;flex:none">
+          ${b.imageDesktop ? `<img src="${esc(b.imageDesktop)}" alt="" style="width:100%;height:100%;object-fit:cover">` : ''}
+          <div style="position:absolute;left:12px;bottom:10px;right:12px;color:#fff;text-shadow:0 1px 6px rgba(0,0,0,.5)"><b>${esc(b.title || 'Headline')}</b><div class="small">${esc(b.text || '')}</div></div>
+        </div>
+        <div style="flex:1;min-width:240px;display:grid;gap:8px">
+          <label>Headline<input data-bf="${i}:title" value="${esc(b.title)}" maxlength="80"></label>
+          <label>Text<input data-bf="${i}:text" value="${esc(b.text || '')}" maxlength="200"></label>
+          <div style="display:flex;gap:8px;flex-wrap:wrap"><label style="flex:1">Button<input data-bf="${i}:cta" value="${esc(b.cta || '')}" placeholder="e.g. Shop now" maxlength="30"></label>
+          <label style="flex:2">Opens<input data-bf="${i}:link" value="${esc(b.link || '')}" placeholder="/shop?kind=sunglasses · /tryon · /product/vista-rectangle"></label></div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <button class="btn" data-act="banImg" data-i="${i}" data-k="imageDesktop">🖥 ${b.imageDesktop ? 'Change' : 'Add'} desktop image</button>
+        <button class="btn" data-act="banImg" data-i="${i}" data-k="imageMobile">📱 ${b.imageMobile ? 'Change' : 'Add'} mobile image</button>
+        ${b.imageMobile ? `<img src="${esc(b.imageMobile)}" alt="" style="height:40px;border-radius:6px">` : ''}
+        <label class="small" style="flex:1;min-width:200px">Image description (for screen readers)<input data-bf="${i}:alt" value="${esc(b.alt || '')}" maxlength="160"></label>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center" class="small">
+        <label class="check"><input type="checkbox" data-bf="${i}:visible" ${b.visible ? 'checked' : ''}> <span>Visible</span></label>
+        <label>From <input type="datetime-local" data-bf="${i}:startsAt" value="${dt(b.startsAt)}"></label>
+        <label>Until <input type="datetime-local" data-bf="${i}:endsAt" value="${dt(b.endsAt)}"></label>
+        <span class="grow"></span>
+        <button class="link" data-act="banMove" data-i="${i}" data-d="-1" ${i === 0 ? 'disabled' : ''}>↑ Up</button>
+        <button class="link" data-act="banMove" data-i="${i}" data-d="1" ${i === list.length - 1 ? 'disabled' : ''}>↓ Down</button>
+        <button class="link" style="color:#f87171" data-act="banDel" data-i="${i}">🗑 Remove</button>
+      </div></div>`;
+    return shell(`<div class="bar"><h1 class="grow">Home banners</h1><button class="btn" data-act="banAdd">+ Add banner</button><button class="btn p" data-act="banSave">Save banners</button></div>
+      <p class="small muted">Banners rotate at the top of Home in the app and website. Best image sizes: desktop 1600 × 600, mobile 900 × 900 (JPG/PNG/WebP, under 5 MB). Without an image, the banner shows your brand gradient with the headline. Only real offers, please: customers can see them.</p>
+      ${list.length ? list.map(card).join('') : '<div class="card"><p>No banners yet. Tap <b>+ Add banner</b>. Until you add some, Home shows its usual sections.</p></div>'}
+      <input type="file" id="banFile" accept="image/jpeg,image/png,image/webp" hidden>`);
   }
 
   function render() {
@@ -667,7 +773,7 @@
     if (!S.token || !S.user) { app.innerHTML = loginView(); return; }
     const v = S.view;
     app.innerHTML = v === 'products' ? productsView() : v === 'edit' ? editorView() : v === 'pricing' ? pricingView()
-      : v === 'orders' ? ordersView() : v === 'order' ? orderView() : v === 'settings' ? settingsView() : v === 'quick' ? quickView() : v === 'alerts' ? alertsView() : v === 'reviews' ? reviewsView() : v === 'rewards' ? rewardsView() : v === 'stores' ? storesView() : v === 'eyetest' ? eyeTestView() : v === 'ig' ? igView() : v === 'import' ? importView() : rxView();
+      : v === 'orders' ? ordersView() : v === 'order' ? orderView() : v === 'settings' ? settingsView() : v === 'quick' ? quickView() : v === 'alerts' ? alertsView() : v === 'reviews' ? reviewsView() : v === 'rewards' ? rewardsView() : v === 'stores' ? storesView() : v === 'eyetest' ? eyeTestView() : v === 'ig' ? igView() : v === 'import' ? importView() : v === 'banners' ? bannersView() : rxView();
     if (v === 'settings') drawTestQr();
     if (v === 'edit') wireDrop();
   }
@@ -689,6 +795,7 @@
       if (view === 'reviews') { S.data.settings = S.data.settings || await api('/admin/settings'); S.data.reviews = await api('/admin/reviews?status=' + (S.data.reviewFilter || 'PENDING')); }
       if (view === 'rewards') { S.data.settings = S.data.settings || await api('/admin/settings'); S.data.giftcards = await api('/admin/giftcards'); }
       if (view === 'stores') S.data.stores = await api('/admin/stores');
+      if (view === 'banners') S.data.banners = await api('/admin/banners');
       if (view === 'eyetest') S.data.eyetests = await api('/admin/eye-test');
     } catch (e) { toast(e.message); }
     if (S.view === view) render();
@@ -720,6 +827,23 @@
     d.addEventListener('drop', async (e) => { const urls = await uploadFiles([...e.dataTransfer.files], 'products'); S.edit.images.push(...urls); render(); if (urls.length) toast('Photos added. Save to publish them.'); });
   }
 
+  /** Small dialog with several choices (e.g. Replace / Keep both / Skip). Resolves with the chosen value. */
+  function choose(title, message, options) {
+    return new Promise((resolve) => {
+      const d = document.createElement('div');
+      d.style.cssText = 'position:fixed;inset:0;background:rgba(2,3,20,.75);display:flex;align-items:center;justify-content:center;z-index:99;padding:16px';
+      d.innerHTML = `<div class="card" style="max-width:460px;width:100%"><h2>${esc(title)}</h2><p>${esc(message)}</p><div style="display:flex;flex-direction:column;gap:8px">${options.map((o, i) => `<button class="btn ${i === 0 ? 'p' : ''}" data-v="${esc(o.v)}">${esc(o.label)}</button>`).join('')}</div></div>`;
+      d.addEventListener('click', (e) => { const b = e.target.closest('button[data-v]'); if (b) { d.remove(); resolve(b.dataset.v); } });
+      document.body.appendChild(d);
+    });
+  }
+  /** "Name (2)", "Name (3)"… not used by another frame yet. */
+  function nextCopyName(name) {
+    const taken = new Set((S.data.products || []).map((x) => x.name.trim().toLowerCase()));
+    for (let n = 2; n < 1000; n++) if (!taken.has(`${name} (${n})`.toLowerCase())) return { name: `${name} (${n})`, n };
+    return { name: `${name} (copy)`, n: 'copy' };
+  }
+
   function productPayload() {
     const p = S.edit;
     const base = slugify(p.slug || p.name);
@@ -728,7 +852,8 @@
       shape: p.shape, material: p.material, gender: p.gender, isSunglasses: !!p.isSunglasses,
       basePrice: Math.round(+p.basePrice), mrp: Math.round(+p.mrp),
       lensWidthMm: +p.lensWidthMm, bridgeMm: +p.bridgeMm, templeMm: +p.templeMm, frameWidthMm: +p.frameWidthMm,
-      weightGrams: p.weightGrams === '' || p.weightGrams == null ? null : +p.weightGrams, tryOnImage: p.tryOnImage || null, isActive: p.isActive, instagramPostUrl: (p.instagramPostUrl || '').trim().split('?')[0] || null,
+      weightGrams: p.weightGrams === '' || p.weightGrams == null ? null : +p.weightGrams, tryOnImage: p.tryOnImage || null, isActive: p.isActive,
+      tryOn3d: p.tryOn3d && p.tryOn3d.url ? { url: p.tryOn3d.url.trim(), scale: +p.tryOn3d.scale || 1, offsetY: +p.tryOn3d.offsetY || 0, offsetZ: +p.tryOn3d.offsetZ || 0, rotX: +p.tryOn3d.rotX || 0 } : null, instagramPostUrl: (p.instagramPostUrl || '').trim().split('?')[0] || null,
       images: p.images,
       variants: p.variants.map((v, i) => ({ ...(v.id ? { id: v.id } : {}), sku: (v.sku || `${base}-${slugify(v.colorName) || i}-${v.size[0]}`).toUpperCase().slice(0, 60),
         colorName: v.colorName.trim(), colorHex: v.colorHex, size: v.size, stock: Math.max(0, parseInt(v.stock, 10) || 0), priceDelta: Math.round(+v.priceDelta || 0) })),
@@ -795,8 +920,30 @@
         el.disabled = true;
         try {
           const body = productPayload();
-          const saved = p.id ? await api('/admin/products/' + p.id, { method: 'PUT', body }) : await api('/admin/products', { body });
-          toast(p.id ? 'Changes saved' : 'Frame added'); S.edit = null; S.data.products = null; return load('products');
+          try {
+            p.id ? await api('/admin/products/' + p.id, { method: 'PUT', body }) : await api('/admin/products', { body });
+            toast(p.id ? 'Changes saved' : 'Frame added');
+          } catch (x) {
+            if (!x.details?.existingId) throw x;
+            // Same name already in the shop: replace it, keep both, or skip.
+            const opts = [...(p.id ? [] : [{ v: 'replace', label: 'Replace the existing frame with these details' }]),
+              { v: 'both', label: `Keep both (save this one as "${nextCopyName(p.name.trim()).name}")` }, { v: 'skip', label: p.id ? 'Cancel' : 'Skip (don\'t add this frame)' }];
+            const v = await choose('This frame already exists', `"${p.name.trim()}" is already in your shop.`, opts);
+            if (v === 'skip') { el.disabled = false; return; }
+            if (v === 'replace') {
+              const old = await api('/admin/products/' + x.details.existingId);
+              // Same colour + size keeps the existing colour (and its order history); others are added.
+              const variants = body.variants.map((vv) => { const m = old.variants.find((ov) => ov.sku === vv.sku || (ov.colorName.toLowerCase() === vv.colorName.toLowerCase() && ov.size === vv.size)); return m ? { ...vv, id: m.id, sku: m.sku } : { ...vv, id: undefined }; });
+              await api('/admin/products/' + x.details.existingId, { method: 'PUT', body: { ...body, slug: old.slug, variants } });
+              toast('Existing frame replaced');
+            } else {
+              const c = nextCopyName(p.name.trim());
+              const copy = { ...body, name: c.name, slug: `${body.slug}-${c.n}`, variants: body.variants.map((vv) => ({ ...vv, sku: `${vv.sku}-${c.n}`.slice(0, 64) })) };
+              p.id ? await api('/admin/products/' + p.id, { method: 'PUT', body: copy }) : await api('/admin/products', { body: copy });
+              toast(`Saved as "${c.name}"`);
+            }
+          }
+          S.edit = null; S.data.products = null; return load('products');
         } catch (x) { err.textContent = x.message; el.disabled = false; return; }
       }
       if (act === 'addTrack') {
@@ -848,6 +995,66 @@
       }
       if (act === 'pickQr') return $('#qrInput').click();
       if (act === 'qrDel') { S.data.settings = await api('/admin/settings', { method: 'PUT', body: { upiQrImage: null } }); toast('QR image removed'); return render(); }
+      if (act === 'noop') return;
+      if (act === 'toggleLive') {
+        const p = S.data.products.find((x) => x.id === el.dataset.id); if (!p) return;
+        el.disabled = true;
+        const up = await api('/admin/products/' + p.id, { method: 'PATCH', body: { isActive: !p.isActive } });
+        p.isActive = up.isActive; toast(p.isActive ? `${p.name} is live` : `${p.name} is hidden`); return render();
+      }
+      if (act === 'stockOpen') { S.stockOpen = S.stockOpen === el.dataset.id ? null : el.dataset.id; return render(); }
+      if (act === 'stockClose') { S.stockOpen = null; return render(); }
+      if (act === 'stockAll') { const v = $('#stockAll').value; if (v !== '') document.querySelectorAll('.stockIn').forEach((i) => { i.value = v; }); return; }
+      if (act === 'stockSave') {
+        const stocks = [...document.querySelectorAll('.stockIn')].map((i) => ({ id: i.dataset.vid, stock: Math.max(0, Math.round(Number(i.value) || 0)) }));
+        el.disabled = true;
+        const up = await api('/admin/products/' + el.dataset.id + '/stock', { method: 'PUT', body: { stocks } });
+        const i = S.data.products.findIndex((x) => x.id === el.dataset.id); if (i >= 0) S.data.products[i] = up;
+        S.stockOpen = null; toast('Stock saved'); return render();
+      }
+      if (act === 'banAdd') { S.data.banners.push({ id: 'b' + Date.now().toString(36), title: 'New banner', text: '', cta: 'Shop now', link: '/shop', imageDesktop: null, imageMobile: null, alt: '', visible: false, startsAt: null, endsAt: null }); return render(); }
+      if (act === 'banDel') { if (!confirm('Remove this banner?')) return; S.data.banners.splice(+el.dataset.i, 1); return render(); }
+      if (act === 'banMove') { const i = +el.dataset.i, j = i + +el.dataset.d, l = S.data.banners; [l[i], l[j]] = [l[j], l[i]]; return render(); }
+      if (act === 'banImg') { S.banTarget = { i: +el.dataset.i, k: el.dataset.k }; return $('#banFile').click(); }
+      if (act === 'banSave') {
+        el.disabled = true;
+        try { S.data.banners = await api('/admin/banners', { method: 'PUT', body: { banners: S.data.banners } }); toast('Banners saved: Home updates within a minute'); }
+        catch (e) { toast(e.message); }
+        el.disabled = false; return render();
+      }
+      if (act === 'pfClear') { S.pf = {}; S.psel = new Set(); return render(); }
+      if (act === 'pfilter') { S.pfilter = el.dataset.v; S.psel = new Set(); return render(); }
+      if (act === 'pselOne') { const id = el.dataset.id; S.psel = S.psel || new Set(); el.checked ? S.psel.add(id) : S.psel.delete(id); return render(); }
+      if (act === 'pselAll') {
+        const shown = [...document.querySelectorAll('.psel')].map((i) => i.dataset.id);
+        S.psel = el.checked ? new Set(shown) : new Set(); return render();
+      }
+      if (act === 'pselNone') { S.psel = new Set(); return render(); }
+      if (act === 'delProduct') {
+        const p = S.data.products.find((x) => x.id === el.dataset.id); if (!p) return;
+        if (!confirm(`Delete "${p.name}" completely? This can't be undone. (If it's in past orders it will be hidden instead.)`)) return;
+        const r = await api('/admin/products/' + p.id, { method: 'DELETE' });
+        toast(r.result === 'deleted' ? `${p.name} deleted` : `${p.name} is in past orders, so it was hidden and set to 0 stock`);
+        S.psel?.delete(p.id); S.data.products = null; return load('products');
+      }
+      if (act === 'bulk') {
+        const ids = [...(S.psel || [])], action = el.dataset.v; if (!ids.length) return;
+        const stock = Math.max(0, Math.round(Number($('#bulkStock')?.value) || 0));
+        const what = { show: `Show ${ids.length} frames to customers`, hide: `Hide ${ids.length} frames`, stock: `Set the stock of every colour of ${ids.length} frames to ${stock}`, delete: `Delete ${ids.length} frames completely (frames in past orders are hidden instead)` }[action];
+        if (!confirm(what + '?')) return;
+        el.disabled = true;
+        const r = await api('/admin/products/bulk', { body: { ids, action, ...(action === 'stock' ? { stock } : {}) } });
+        toast(action === 'delete' ? `${r.deleted} deleted${r.hidden ? `, ${r.hidden} hidden (in past orders)` : ''}` : 'Done');
+        S.psel = new Set(); S.data.products = null; return load('products');
+      }
+      if (act === 'showHidden') {
+        const n = S.data.products.filter((p) => !p.isActive).length, stock = Math.max(0, Math.round(Number($('#showStock')?.value) || 0));
+        if (!confirm(`Show all ${n} hidden frames to customers${stock ? ` and give out-of-stock colours a stock of ${stock}` : ''}?`)) return;
+        el.disabled = true;
+        const r = await api('/admin/products/show-hidden', { body: { stock: stock || undefined } });
+        toast(`${r.shown} frames are now live`); S.data.products = null; return load('products');
+      }
+      if (act === 'impMode') { S.imp.onExisting = el.dataset.v; return render(); }
       if (act === 'impKind') { S.imp = { kind: el.dataset.k, file: null, csv: null, result: null, busy: false }; return render(); }
       if (act === 'impTemplate') {
         const kind = S.imp.kind, r = await fetch(API + '/admin/import/template/' + kind, { headers: { Authorization: 'Bearer ' + S.token } });
@@ -858,7 +1065,8 @@
         const show = $('#impShow'), stk = $('#impStock');
         if (show) S.imp.showAll = show.checked;
         if (stk) S.imp.stock = Math.max(0, Math.round(Number(stk.value) || 0));
-        const opts = S.imp.kind === 'frames' ? { showAll: !!S.imp.showAll, defaultStock: S.imp.stock || undefined } : {};
+        const opts = { ...(S.imp.kind === 'frames' ? { showAll: !!S.imp.showAll, defaultStock: S.imp.stock || undefined } : {}),
+          ...(act === 'impRun' ? { onExisting: S.imp.onExisting || 'replace', choices: S.imp.choices || {} } : {}) };
         try { S.imp.result = await api('/admin/import/' + S.imp.kind, { body: { csv: S.imp.csv, dryRun: act === 'impCheck', ...opts } }); if (act === 'impRun') { S.data.products = null; toast('Import finished'); } }
         catch (e) { toast(e.message); }
         S.imp.busy = false; return render();
@@ -1018,6 +1226,31 @@
     const t = e.target;
     try {
       if (t.dataset.gc) { await api(`/admin/giftcards/${t.dataset.gc}`, { method: 'PATCH', body: { isActive: t.checked } }); toast(t.checked ? 'Gift card active' : 'Gift card turned off'); }
+      if (t.dataset.f3 && S.edit) {
+        S.edit.tryOn3d = { scale: 1, offsetY: 0, offsetZ: 0, rotX: 0, ...(S.edit.tryOn3d || {}), [t.dataset.f3]: t.dataset.f3 === 'url' ? t.value : Number(t.value) };
+        return;
+      }
+      if (t.dataset.bf) {
+        const [i, k] = t.dataset.bf.split(':'), b = S.data.banners[+i];
+        b[k] = t.type === 'checkbox' ? t.checked : t.type === 'datetime-local' ? (t.value ? new Date(t.value).toISOString() : null) : t.value;
+        if (k === 'visible') render();
+        return;
+      }
+      if (t.id === 'banFile') {
+        const f = t.files[0]; t.value = ''; if (!f || !S.banTarget) return;
+        const [url] = await uploadFiles([f], 'banners'); if (!url) return;
+        S.data.banners[S.banTarget.i][S.banTarget.k] = url; toast('Image added: tap Save banners'); return render();
+      }
+      if (t.dataset.ch !== undefined && S.imp) {
+        S.imp.choices = S.imp.choices || {};
+        if (t.value) S.imp.choices[t.dataset.ch] = t.value; else delete S.imp.choices[t.dataset.ch];
+        return;
+      }
+      if (t.dataset.pf) {
+        const k = t.dataset.pf, v = t.value;
+        S.pf = S.pf || {}; S.pf[k] = v === '' ? undefined : (k === 'min' || k === 'max') ? Math.max(0, Number(v)) : v;
+        S.psel = new Set(); return render();
+      }
       if (t.id === 'impFile') {
         const f = t.files[0]; if (!f) return;
         if (f.size > 15_000_000) { toast('That file is over 15 MB: split it into smaller files.'); return; }

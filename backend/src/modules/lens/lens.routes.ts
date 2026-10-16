@@ -27,7 +27,7 @@ r.get('/options', ah(async (req, res) => {
     requiresAdd: t === 'BIFOCAL' || t === 'PROGRESSIVE',
     startingPrice: Math.min(...packages.filter((p) => p.lensType === t).map((p) => p.price), Infinity),
     packages: packages.filter((p) => p.lensType === t),
-    allowedCoatings: allowedCoatings(t, isSunglasses),
+    allowedCoatings: allowedCoatings(t, isSunglasses, coatings),
   })).filter((t) => t.packages.length);
   res.json({ types, coatings });
 }));

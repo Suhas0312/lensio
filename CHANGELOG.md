@@ -9,6 +9,22 @@ Server versions are shown in `/v1/config` and the admin header. App versions are
 - **← Back on every screen:** all screens with a header (product, cart, checkout, wishlist, compare, Ask Lensio, orders, eye test, stores, rewards…), the Shop/Orders/Account tabs and the sign-in screen. Goes to the previous screen, or Home when a page was opened directly from a link. Try-on's ← now works when opened from the tab bar. Tested on 12 screens.
 - **Ask Lensio greetings:** understands “Hlo”, “helo”, “hii”, “hai”, “heyy”, “Namaskara”, “good morning” and similar.
 
+## 3.5.0 · Shopping experience + 2D/3D try-on (app, website, admin)
+- **Home banners** (Admin → Banners): rotating carousel with desktop and mobile images, headline, text, button, link, visibility, start/end dates, order. Brand-gradient banners when no image. Only real offers.
+- **Home discovery** (existing sections kept): Collections (Men, Women, Kids, Eyeglasses, Sunglasses, Titanium), Shop by frame shape, Shop by face shape (with AI face-scan shortcut), Recently viewed.
+- **Shop:** colour and brand filters (only what you stock), For (Men/Women/Kids), material and price ranges, search by name/brand/code with suggestions and thumbnails; links from Home open the Shop already filtered.
+- **Product page:** Similar frames, Recently viewed.
+- **3D try-on** (2D/3D switch): real 3D frame with rims, bridge, lenses and temple arms built from each frame's shape, size, material and colour, following head turn/nod/tilt from the 478-point face mesh, arms hidden behind the head; frame's own GLB/glTF model with size/offset/tilt calibration in Admin → frame; automatic 2D fallback; 3D captures.
+- **Admin:** frame filters (type, for/age, shape, material, stock, price); import asks what to do with items that already exist (Replace / Keep both / Skip, all or per item); Add frame offers the same when the name exists.
+
+## 3.4.0 · Server + Android app + website
+- **Lens and coating pictures** on the lens choice screen: thickness by index (1.56 → 1.74), progressive zones, bifocal D-top / Kryptok, and every coating (gold/silver/blue mirror, polarised, photochromic, blue cut, anti-glare, water repellent, hard coat, UV, tint, night drive).
+- **All imported coatings now appear:** the allowed list was fixed to 4 coatings; now every active coating shows (mirror/polarised only for sunglasses; blue cut/photochromic/night drive not for sunglasses).
+- **Admin → Frames:** Live/Hidden switch and stock right in the list; tick boxes with Show / Hide / Set stock / Delete; filters All / Live / Hidden / Duplicates; Edit and Delete on every row; “Show all hidden frames”. Frames in past orders are hidden instead of deleted.
+- **No double entries:** a frame name (and brand) can exist only once (Add frame, Edit, Instagram import); duplicates are marked in the list.
+- Bulk import shows the chosen file name and saves 6 frames at a time (large files no longer time out).
+- Shop: “Showing 20 of 309 frames” and a “Show more frames” button.
+
 ## 3.3.0 (server update, same version)
 - **Prescription approval only for power lenses:** zero-power glasses are approved automatically and go straight to lens fitting (they used to skip fitting, or wait if “frame-only to QC” was off); frames only and plain sunglasses go to quality check; power lenses always wait for the shop. Order tracking shows the right steps. Tested.
 - **Libraries to import in admin:** 309 original frame designs (1,545 colour options), 14 lens options and 11 coatings (docs/catalog). Bulk import has **“Show these frames to customers right away”** with a starting stock. Lens/coating codes in the sheet are kept as written, so existing ones are updated, not duplicated (bug fixed).

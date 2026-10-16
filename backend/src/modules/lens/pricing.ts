@@ -6,13 +6,21 @@ export interface PriceLine {
   framePrice: number; lensPrice: number; coatingPrice: number; unitPrice: number;
 }
 
-/** Coating pairs that cannot be combined on one lens. Extend as your lab's capabilities dictate. */
-const INCOMPATIBLE: [string, string][] = [];
+/** Coating pairs that cannot be combined on one lens (photochromic + blue cut is its own option). */
+const INCOMPATIBLE: [string, string][] = [['PHOTOCHROMIC', 'PHOTO_BLUE'], ['BLUE_CUT', 'PHOTO_BLUE'], ['PHOTOCHROMIC', 'POLARISED']];
 
-/** Which coatings a lens can take. Sunglass lenses are already tinted, so no blue cut or photochromic. */
-export function allowedCoatings(_lensType: LensType | null, isSunglasses: boolean): string[] {
-  if (isSunglasses) return ['ARC', 'HYDROPHOBIC'];
-  return ['BLUE_CUT', 'ARC', 'HYDROPHOBIC', 'PHOTOCHROMIC'];
+const SUN_ONLY = /mirror|polari[sz]/i;                       // only makes sense on sunglasses
+const NOT_FOR_SUN = /blue|photo|transition|night|drive/i;   // sunglass lenses are already tinted
+
+/**
+ * Which coatings a lens can take: every active coating the shop has (so imported coatings appear automatically),
+ * except mirror/polarised on clear glasses and blue cut / photochromic / night drive on sunglasses.
+ */
+export function allowedCoatings(_lensType: LensType | null, isSunglasses: boolean, coatings: { code: string; name: string }[]): string[] {
+  return coatings.filter((c) => {
+    const k = `${c.code} ${c.name}`;
+    return isSunglasses ? !NOT_FOR_SUN.test(k) : !SUN_ONLY.test(k);
+  }).map((c) => c.code);
 }
 
 export function priceItem(args: {
@@ -24,7 +32,7 @@ export function priceItem(args: {
   const framePrice = args.frameBase + args.variantDelta;
 
   // Coatings: all requested must exist, be active and be allowed.
-  const allowed = allowedCoatings(lens?.lensType ?? null, args.isSunglasses);
+  const allowed = allowedCoatings(lens?.lensType ?? null, args.isSunglasses, coatings.filter((c) => c.isActive));
   const unique = [...new Set(requestedCodes)];
   for (const code of unique) {
     if (!allowed.includes(code)) throw badRequest('COATING_NOT_ALLOWED', `${code} is not available for this lens`);

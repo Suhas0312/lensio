@@ -227,6 +227,7 @@
     $('#selMeta').innerHTML = `${inr(f.basePrice)} · ${f.lensWidthMm}-${f.bridgeMm}-${f.templeMm} mm · ${f.frameWidthMm} mm wide${fitNote(f)}`;
   }
   async function showOverlay() {
+    if (S.view3d && L3D && L3D.ready && S.sel) L3D.setFrame(S.sel, S.color);
     const f = S.sel; if (!f) return;
     const url = await frameOverlay(f, S.color);
     if (S.sel !== f) return;                                 // user picked another frame meanwhile
@@ -296,7 +297,7 @@
       const mix = (p, q) => ({ x: p.x + (q.x - p.x) * k, y: p.y + (q.y - p.y) * k });
       S.face = { L: mix(prev.L, a), R: mix(prev.R, b) };
     } else S.face = { L: a, R: b };
-    if (!S.shape) {
+    if (!S.shape && raw.pts) {
       S.votes = S.votes || {}; const c = classify(raw.pts); S.votes[c] = (S.votes[c] || 0) + 1;
       const total = Object.values(S.votes).reduce((x, y) => x + y, 0);
       if (total >= (S.mode === 'photo' ? 1 : 18)) {                  // ~2 s of live video, or one photo
@@ -322,6 +323,7 @@
     return autoPose() || S.manual || { cx: stage.clientWidth / 2, cy: stage.clientHeight * 0.42, w: stage.clientWidth * 0.55, rot: 0 };
   }
   function place() {
+    if (S.view3d) { overlay.style.display = 'none'; if (S.mode !== 'none') $('#captureBtn').disabled = false; return; }
     if (!overlay.naturalWidth || S.mode === 'none') { overlay.style.display = 'none'; return; }
     // Live camera: show glasses only once the face is found (no big placeholder glasses in the middle).
     if (S.mode === 'live' && !S.face && !S.manual) { overlay.style.display = 'none'; return; }
@@ -331,6 +333,34 @@
     $('#captureBtn').disabled = false;
   }
 
+  // ---------- 3D view (three.js, tryon3d.js) ----------
+  const L3D = window.Lensio3D;
+  /** One 3D tracking step: face mesh → 3D frame pose; returns eye points so the rest of the page keeps working. */
+  async function track3d(src, w, h) {
+    const fm = await mesh(); const res = await meshOnce(fm, src);
+    const lm = res && res.multiFaceLandmarks && res.multiFaceLandmarks[0];
+    if (!lm) { L3D.clear(); return null; }
+    const W = stage.clientWidth, H = stage.clientHeight;
+    const k = S.mode === 'live' ? Math.max(W / w, H / h) : Math.min(W / w, H / h);
+    L3D.update(lm, (p) => mapPoint({ x: p.x * w, y: p.y * h }), w * k, (S.measure && S.measure.pd) || 63);
+    return { L: { x: lm[468].x * w, y: lm[468].y * h }, R: { x: lm[473].x * w, y: lm[473].y * h } };
+  }
+  async function setView3d(on) {
+    if (on && !(L3D && L3D.supported)) { toast('3D try-on isn\'t supported on this device: showing 2D.'); on = false; }
+    if (on && !L3D.ready) { try { L3D.init(stage); } catch { toast('3D try-on couldn\'t start: showing 2D.'); on = false; } }
+    S.view3d = on;
+    $('#v2d').classList.toggle('on', !on); $('#v3d').classList.toggle('on', on);
+    $('#v2d').setAttribute('aria-pressed', String(!on)); $('#v3d').setAttribute('aria-pressed', String(on));
+    if (L3D && L3D.ready) {
+      L3D.show(on);
+      if (on && S.sel) { status('Loading 3D frame…'); await L3D.setFrame(S.sel, S.color); status(S.mode === 'none' ? 'Turn on the camera or upload a selfie' : '<span class="dot"></span>3D: turn your head to see the arms'); }
+      if (on && S.mode === 'photo') await track3d(photo, photo.naturalWidth, photo.naturalHeight);
+    }
+    place();
+  }
+  $('#v2d').addEventListener('click', () => setView3d(false));
+  $('#v3d').addEventListener('click', () => setView3d(true));
+
   // Live tracking loop
   let loopT = null;
   function startLoop() {
@@ -339,7 +369,7 @@
       if (S.mode !== 'live' || S.busy || S.measuring || !video.videoWidth) return;
       S.busy = true;
       try {
-        const r = await detect(video, 224);
+        const r = S.view3d ? await track3d(video, video.videoWidth, video.videoHeight) : await detect(video, 224);
         if (r) { S.misses = 0; setFace(r); if (!S.following) { S.following = true; status('<span class="dot"></span>Following your face'); } }
         else if (++S.misses > 12) {                                   // ~1.5 s without a face: then say so
           if (S.following !== false) { S.following = false; status('Look at the camera'); }
@@ -383,6 +413,7 @@
       const r = await detect(photo, 416);
       if (!r) { status('No face found. Drag the frame into place'); toast('Use a front-facing photo with your eyes visible.'); return; }
       setFace(r); place(); status('<span class="dot"></span>Fitted to your face');
+      if (S.view3d) await track3d(photo, photo.naturalWidth, photo.naturalHeight);
     } catch { status('Drag the frame into place'); }
   }
 
@@ -685,8 +716,11 @@
       const iw = photo.naturalWidth, ih = photo.naturalHeight, k = Math.min(W / iw, H / ih);
       g.drawImage(photo, (W - iw * k) / 2, (H - ih * k) / 2, iw * k, ih * k);
     }
-    const p = currentPose(), h = p.w * overlay.naturalHeight / overlay.naturalWidth;
-    g.save(); g.translate(p.cx, p.cy); g.rotate(p.rot); g.drawImage(overlay, -p.w / 2, -h / 2, p.w, h); g.restore();
+    if (S.view3d && L3D && L3D.canvas()) g.drawImage(L3D.canvas(), 0, 0, W, H);   // the 3D frame exactly as on screen
+    else {
+      const p = currentPose(), h = p.w * overlay.naturalHeight / overlay.naturalWidth;
+      g.save(); g.translate(p.cx, p.cy); g.rotate(p.rot); g.drawImage(overlay, -p.w / 2, -h / 2, p.w, h); g.restore();
+    }
     // small watermark
     g.fillStyle = 'rgba(4,7,34,.6)'; g.fillRect(W - 150, H - 30, 142, 22);
     g.fillStyle = '#fff'; g.font = '600 12px Quicksand, sans-serif'; g.fillText(`Lensio · ${S.sel ? S.sel.name : ''}`.slice(0, 26), W - 144, H - 15);
@@ -876,6 +910,7 @@
   // ← stays visible inside the app and website too: the Try on screen has no other back button.
   // Phones resize the page constantly (address bar, rotation): re-map the last detected face to the new size.
   window.addEventListener('resize', () => {
+    if (L3D && L3D.ready) L3D.resize();
     const raw = S.raw; S.face = null; S.manual = null;
     if (raw && S.mode !== 'none') setFace(raw);
     place();

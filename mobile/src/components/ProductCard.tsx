@@ -8,7 +8,7 @@ import { useCompare, useWishlist } from '@/store/shopping';
 import { Text } from './UI';
 
 /** Frame card: photo, ♥ wishlist and ⇄ compare buttons, price, discount and colours. */
-export function ProductCard({ p, width }: { p: Product; width: number }) {
+export function ProductCard({ p, width, onQuickView }: { p: Product; width: number; onQuickView?: (p: Product) => void }) {
   const colorsAvail = [...new Map((p.variants ?? []).map((v) => [v.colorHex, v])).values()].slice(0, 4);
   const off = p.mrp > p.basePrice ? Math.round((1 - p.basePrice / p.mrp) * 100) : 0;
   const liked = useWishlist((s) => s.ids.has(p.id)), toggleLike = useWishlist((s) => s.toggle);
@@ -31,6 +31,12 @@ export function ProductCard({ p, width }: { p: Product; width: number }) {
             style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: comparing ? colors.violet : 'rgba(255,255,255,0.92)', alignItems: 'center', justifyContent: 'center' }}>
             <Ionicons name="git-compare-outline" size={18} color={comparing ? '#fff' : '#1B1F3B'} />
           </Pressable>
+          {onQuickView ? (
+            <Pressable onPress={() => onQuickView(p)} hitSlop={8} accessibilityRole="button" accessibilityLabel={`Quick view ${p.name}`}
+              style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(255,255,255,0.92)', alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="eye-outline" size={18} color="#1B1F3B" />
+            </Pressable>
+          ) : null}
         </View>
       </View>
       <Text v="bodyStrong" numberOfLines={1}>{p.name}</Text>

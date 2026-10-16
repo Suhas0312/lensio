@@ -5,6 +5,9 @@ import { router, useLocalSearchParams, Stack } from 'expo-router';
 import { useLayout } from '@/lib/layout';
 import { api, cachedApi } from '@/api/client';
 import { useCompare, useWishlist } from '@/store/shopping';
+import { useRecent } from '@/lib/recent';
+import { SimilarFrames } from '@/components/SimilarFrames';
+import { RecentlyViewed } from '@/components/HomeSections';
 import { FrameSize, Product } from '@/api/types';
 import { useLensFlow } from '@/store/lensFlow';
 import { useAuth } from '@/store/auth';
@@ -34,6 +37,7 @@ export default function ProductScreen() {
   useEffect(() => {
     const apply = (r: Product) => {
       setP(r);
+      useRecent.getState().add({ id: r.id, slug: r.slug, name: r.name, image: r.images?.[0]?.url ?? null, price: r.basePrice });
       // Size measured in the try-on (or chosen there) is preselected when that size is in stock.
       const first = r.variants.find((v) => v.size === wantSize && v.stock > 0) ?? r.variants.find((v) => v.stock > 0) ?? r.variants[0];
       setColor(first?.colorHex); setSize(first?.size);
@@ -148,6 +152,8 @@ export default function ProductScreen() {
       {(p as any).instagramPostUrl ? <Button kind="secondary" title="📸 View on Instagram" onPress={() => Linking.openURL((p as any).instagramPostUrl)} /> : null}
 
       <ProductReviews slug={p.slug} />
+      <SimilarFrames p={p} />
+      <RecentlyViewed excludeId={p.id} />
       <View style={{ height: space(2), borderRadius: radius.sm }} />
     </Screen>
   );

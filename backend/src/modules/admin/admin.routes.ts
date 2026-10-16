@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { FrameMaterial, FrameShape, FrameSize, Gender, OrderStatus, Prisma, PrescriptionStatus } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import { ah } from '../../lib/asyncHandler';
-import { badRequest, notFound } from '../../lib/errors';
+import { AppError, badRequest, notFound } from '../../lib/errors';
 import multer from 'multer';
 import { putPublicFile, signedUrl } from '../../lib/storage';
 import { requireAuth, requireRole } from '../../middleware/auth';
@@ -14,6 +14,7 @@ import { STATUS_LABEL } from '../notifications/whatsapp.service';
 import { androidRelease } from '../settings/appRelease';
 import { testGeminiKeys } from '../assistant/assistant.service';
 import { importCatalog, Kind, TEMPLATES } from '../catalogImport/import.service';
+import { bannerSchema, getBanners, saveBanners } from '../banners/banners';
 import { getSettings, saveSettings } from '../settings/settings.service';
 import { sendMail } from '../../lib/mail';
 import { notifyEyeTest, notifyOrderUpdate } from '../notifications/whatsapp.service';
@@ -241,7 +242,7 @@ const imageUpload = multer({
 /** Upload one product photo or try-on PNG. Returns its public URL to put in the product. */
 r.post('/uploads', adminOnly, imageUpload.single('file'), ah(async (req, res) => {
   if (!req.file) throw badRequest('NO_FILE', 'Choose an image to upload');
-  const folder = req.body.kind === 'tryon' ? 'tryon' : req.body.kind === 'settings' ? 'settings' : 'products';
+  const folder = req.body.kind === 'tryon' ? 'tryon' : req.body.kind === 'settings' ? 'settings' : req.body.kind === 'banners' ? 'banners' : req.body.kind === 'models' ? 'models' : 'products';
   res.status(201).json({ url: await putPublicFile(folder, req.file.buffer, req.file.mimetype) });
 }));
 
@@ -263,6 +264,11 @@ const productSchema = z.object({
   lensWidthMm: z.number().int().min(30).max(70), bridgeMm: z.number().int().min(10).max(30),
   templeMm: z.number().int().min(110).max(160), frameWidthMm: z.number().int().min(100).max(170),
   weightGrams: z.number().int().nullable().optional(), tryOnImage: z.string().url().nullable().optional(),
+  tryOn3d: z.object({
+    url: z.string().url().refine((u) => /^https:\/\//.test(u) && /\.(glb|gltf)(\?|$)/i.test(u), 'Use an https link to a .glb or .gltf file'),
+    scale: z.number().min(0.2).max(5).default(1), offsetY: z.number().min(-40).max(40).default(0),
+    offsetZ: z.number().min(-40).max(40).default(0), rotX: z.number().min(-45).max(45).default(0),
+  }).nullable().optional().transform((v) => (v === null ? Prisma.DbNull : v)),   // null = remove the model
   instagramPostUrl: z.string().url().nullable().optional().or(z.literal('').transform(() => null)),
   isActive: z.boolean().default(true),
   images: z.array(z.string().url()).default([]),
@@ -278,14 +284,87 @@ r.get('/products', ah(async (req, res) => {
   }));
 }));
 
+/** Banners: home carousel, managed in admin → Banners. */
+r.get('/banners', adminOnly, ah(async (_req, res) => { res.json(await getBanners()); }));
+r.put('/banners', adminOnly, validate(z.object({ banners: z.array(bannerSchema).max(20) })), ah(async (req, res) => { res.json(await saveBanners(req.body.banners)); }));
+
+/** Frames → "Show all hidden frames": publish every hidden frame, optionally giving out-of-stock colours a stock. */
+r.post('/products/show-hidden', adminOnly, validate(z.object({ stock: z.number().int().min(0).max(100000).optional() })), ah(async (req, res) => {
+  const hidden = await prisma.product.findMany({ where: { isActive: false }, select: { id: true } });
+  const ids = hidden.map((p) => p.id);
+  if (!ids.length) return res.json({ shown: 0, restocked: 0 });
+  const [shown, restocked] = await prisma.$transaction([
+    prisma.product.updateMany({ where: { id: { in: ids } }, data: { isActive: true } }),
+    req.body.stock ? prisma.frameVariant.updateMany({ where: { productId: { in: ids }, stock: 0 }, data: { stock: req.body.stock } }) : prisma.frameVariant.updateMany({ where: { id: '__none__' }, data: {} }),
+  ]);
+  res.json({ shown: shown.count, restocked: restocked.count });
+}));
+
 r.get('/products/:id', ah(async (req, res) => {
   const p = await prisma.product.findUnique({ where: { id: req.params.id }, include: { images: { orderBy: { sortOrder: 'asc' } }, variants: true } });
   if (!p) throw notFound('Product');
   res.json(p);
 }));
 
+/** No double entries: the same frame name (and brand) can exist only once. */
+async function assertNoDuplicate(name: string, brand: string, exceptId?: string) {
+  const dup = await prisma.product.findFirst({
+    where: { name: { equals: name.trim(), mode: 'insensitive' }, brand: { equals: (brand || 'Lensio').trim(), mode: 'insensitive' }, ...(exceptId ? { id: { not: exceptId } } : {}) },
+    select: { id: true, name: true },
+  });
+  if (dup) throw new AppError(409, 'DUPLICATE_FRAME', `A frame named "${dup.name}" already exists. Edit that frame instead, or use a different name.`, { existingId: dup.id });
+}
+
+/**
+ * Deletes a frame completely. A frame that appears in past orders can't be removed (those orders must keep
+ * their details), so it is hidden and its stock set to 0 instead.
+ */
+async function deleteFrame(id: string): Promise<'deleted' | 'hidden' | 'missing'> {
+  const p = await prisma.product.findUnique({ where: { id }, select: { id: true } });
+  if (!p) return 'missing';
+  const ordered = await prisma.orderItem.count({ where: { variant: { productId: id } } });
+  if (ordered) {
+    await prisma.$transaction([
+      prisma.product.update({ where: { id }, data: { isActive: false } }),
+      prisma.frameVariant.updateMany({ where: { productId: id }, data: { stock: 0 } }),
+    ]);
+    return 'hidden';
+  }
+  await prisma.$transaction([
+    prisma.cartItem.deleteMany({ where: { variant: { productId: id } } }),
+    prisma.product.delete({ where: { id } }),            // colours, photos, reviews, wishlists go with it
+  ]);
+  return 'deleted';
+}
+
+r.delete('/products/:id', adminOnly, ah(async (req, res) => {
+  const r2 = await deleteFrame(req.params.id);
+  if (r2 === 'missing') throw notFound('Frame');
+  res.json({ result: r2 });
+}));
+
+/** Frames list → tick several frames → Show / Hide / Set stock / Delete. */
+r.post('/products/bulk', adminOnly, validate(z.object({
+  ids: z.array(z.string()).min(1).max(2000), action: z.enum(['show', 'hide', 'stock', 'delete']), stock: z.number().int().min(0).max(100000).optional(),
+})), ah(async (req, res) => {
+  const { ids, action, stock } = req.body as { ids: string[]; action: string; stock?: number };
+  if (action === 'show' || action === 'hide') {
+    const r2 = await prisma.product.updateMany({ where: { id: { in: ids } }, data: { isActive: action === 'show' } });
+    return res.json({ updated: r2.count });
+  }
+  if (action === 'stock') {
+    if (stock === undefined) throw badRequest('STOCK_MISSING', 'Enter the stock for each colour');
+    const r2 = await prisma.frameVariant.updateMany({ where: { productId: { in: ids } }, data: { stock } });
+    return res.json({ updated: r2.count });
+  }
+  let deleted = 0, hidden = 0;
+  for (const id of ids) { const r2 = await deleteFrame(id); if (r2 === 'deleted') deleted++; else if (r2 === 'hidden') hidden++; }
+  res.json({ deleted, hidden });
+}));
+
 r.post('/products', adminOnly, validate(productSchema), ah(async (req, res) => {
   const { images, variants, ...p } = req.body as z.infer<typeof productSchema>;
+  await assertNoDuplicate(p.name, p.brand);
   res.status(201).json(await prisma.product.create({
     data: { ...p, images: { create: images.map((url, i) => ({ url, sortOrder: i })) }, variants: { create: variants.map(({ id: _id, ...v }) => v) } },
     include: { variants: true, images: true },
@@ -297,6 +376,7 @@ r.put('/products/:id', adminOnly, validate(productSchema), ah(async (req, res) =
   const { images, variants, ...p } = req.body as z.infer<typeof productSchema>;
   const existing = await prisma.product.findUnique({ where: { id: req.params.id }, include: { variants: true } });
   if (!existing) throw notFound('Product');
+  await assertNoDuplicate(p.name, p.brand, existing.id);
   const keep = new Set(variants.filter((v) => v.id).map((v) => v.id));
   const removed = existing.variants.filter((v) => !keep.has(v.id));
 
@@ -319,6 +399,14 @@ r.put('/products/:id', adminOnly, validate(productSchema), ah(async (req, res) =
 
 r.patch('/products/:id', adminOnly, validate(z.object({ isActive: z.boolean() })), ah(async (req, res) => {
   res.json(await prisma.product.update({ where: { id: req.params.id }, data: req.body }));
+}));
+
+/** Frames list → edit stock of every colour of one frame in one go. */
+r.put('/products/:id/stock', adminOnly, validate(z.object({ stocks: z.array(z.object({ id: z.string(), stock: z.number().int().min(0).max(100000) })).min(1).max(200) })), ah(async (req, res) => {
+  const ids = (await prisma.frameVariant.findMany({ where: { productId: req.params.id }, select: { id: true } })).map((v) => v.id);
+  const updates = (req.body.stocks as { id: string; stock: number }[]).filter((x) => ids.includes(x.id));
+  await prisma.$transaction(updates.map((x) => prisma.frameVariant.update({ where: { id: x.id }, data: { stock: x.stock } })));
+  res.json(await prisma.product.findUnique({ where: { id: req.params.id }, include: { images: { orderBy: { sortOrder: 'asc' } }, variants: { orderBy: { colorName: 'asc' } } } }));
 }));
 
 r.patch('/variants/:id/stock', adminOnly, validate(z.object({ stock: z.number().int().min(0) })), ah(async (req, res) => {
@@ -377,10 +465,13 @@ r.get('/import/template/:kind', adminOnly, ah(async (req, res) => {
 r.post('/import/:kind', adminOnly, validate(z.object({
   csv: z.string().min(1).max(15_000_000), dryRun: z.boolean().default(true),
   showAll: z.boolean().optional(), defaultStock: z.number().int().min(0).max(100000).optional(),
+  onExisting: z.enum(['replace', 'both', 'skip']).optional(),
+  choices: z.record(z.enum(['replace', 'both', 'skip'])).optional(),
 })), ah(async (req, res) => {
   const kind = req.params.kind as Kind;
   if (!TEMPLATES[kind]) throw badRequest('BAD_KIND', 'Choose frames, lenses or coatings');
-  res.json(await importCatalog(kind, req.body.csv, req.body.dryRun, { showAll: req.body.showAll, defaultStock: req.body.defaultStock }));
+  const { showAll, defaultStock, onExisting, choices } = req.body;
+  res.json(await importCatalog(kind, req.body.csv, req.body.dryRun, { showAll, defaultStock, onExisting, choices }));
 }));
 /** What customers get right now: the automatic GitHub release (or the admin fallback), for the settings page. */
 r.get('/app-release', adminOnly, ah(async (_req, res) => { res.json(await androidRelease()); }));

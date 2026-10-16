@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Alert, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback } from 'react';
-import { api, ApiError, qs } from '@/api/client';
+import { API_URL, api, ApiError, qs } from '@/api/client';
 import { Coating, LensTypeOption, Prescription } from '@/api/types';
 import { useLensFlow } from '@/store/lensFlow';
 import { Button, Loading, OptionCard, Row, Screen, Text, Empty } from '@/components/UI';
@@ -12,6 +12,9 @@ import { inr } from '@/lib/format';
 type Step = 'type' | 'package' | 'coatings' | 'prescription' | 'review';
 const STEPS: Step[] = ['type', 'package', 'coatings', 'prescription', 'review'];
 const TITLES: Record<Step, string> = { type: 'What will you use them for?', package: 'Choose your lens', coatings: 'Add coatings', prescription: 'Your prescription', review: 'Review' };
+
+/** Picture for a lens type, lens or coating (drawn by the server: thickness, zones, tints, mirrors…). */
+const art = (kind: 'type' | 'lens' | 'coating', code: string) => `${API_URL}/catalog/lens-art/${kind}/${encodeURIComponent(code)}.png`;
 
 export default function LensFlow() {
   const f = useLensFlow();
@@ -76,13 +79,13 @@ export default function LensFlow() {
       <Text v="heading">{TITLES[step]}</Text>
 
       {step === 'type' && types.map((t) => (
-        <OptionCard key={t.lensType} title={t.title} subtitle={t.subtitle} price={`from ${inr(t.startingPrice)}`}
+        <OptionCard key={t.lensType} title={t.title} subtitle={t.subtitle} price={`from ${inr(t.startingPrice)}`} image={art('type', t.lensType)}
           selected={f.type?.lensType === t.lensType}
           onPress={() => f.set({ type: t, pkg: t.packages[0], coatings: f.coatings.filter((c) => t.allowedCoatings.includes(c)), prescriptionId: null, sendRxLater: false })} />
       ))}
 
       {step === 'package' && f.type?.packages.map((p, i) => (
-        <OptionCard key={p.id} title={p.name} subtitle={`${p.description} Up to ±${Number(p.maxAbsSph)} SPH, ±${Number(p.maxAbsCyl)} CYL.`}
+        <OptionCard key={p.id} title={p.name} subtitle={`${p.description} Up to ±${Number(p.maxAbsSph)} SPH, ±${Number(p.maxAbsCyl)} CYL.`} image={art('lens', p.code)}
           price={p.price ? inr(p.price) : 'Included'} badge={i === 1 ? 'Most chosen' : undefined}
           selected={f.pkg?.id === p.id} onPress={() => f.set({ pkg: p })} />
       ))}
@@ -92,7 +95,7 @@ export default function LensFlow() {
           <Text color={colors.muted}>Optional. Pick any that suit how you use your glasses.</Text>
           {coatings.filter((c) => allowed.includes(c.code)).map((c) => {
             const on = f.coatings.includes(c.code);
-            return <OptionCard key={c.code} title={c.name} subtitle={c.description} price={`+${inr(c.price)}`} selected={on}
+            return <OptionCard key={c.code} title={c.name} subtitle={c.description} price={`+${inr(c.price)}`} selected={on} image={art('coating', c.code)}
               onPress={() => f.set({ coatings: on ? f.coatings.filter((x) => x !== c.code) : [...f.coatings, c.code] })} />;
           })}
         </>

@@ -89,7 +89,7 @@ export function createApp() {
         loyalty: { enabled: s.loyaltyEnabled, pointsPer100: s.loyaltyPointsPer100, maxRedeemPercent: s.loyaltyMaxRedeemPercent, pointValueRupees: 1 },
         firstOrderCoupon: 'FIRST10',
         assistantAi: !!(env.GEMINI_API_KEY || env.GEMINI_API_KEY_2),
-        version: '3.3.0',
+        version: '3.5.0',
       });
     } catch (e) { next(e); }
   });
@@ -140,7 +140,8 @@ export function createApp() {
   app.use('/tryon/models', express.static(path.resolve(__dirname, '../public/tryon/models'), { maxAge: '7d' }));
   // MediaPipe Face Mesh (iris tracking for size measurement). Loaded only when a customer taps "Measure my size".
   app.use('/tryon/mp', express.static(path.resolve(__dirname, '../public/tryon/mp'), { maxAge: '30d', immutable: true }));
-  app.get(['/tryon/face-api.js', '/tryon/tryon.js'], (req, res) => res.sendFile(path.resolve(__dirname, '../public/tryon', path.basename(req.path)), { maxAge: req.path.endsWith('face-api.js') ? '7d' : 0 }));
+  app.use('/tryon/three', express.static(path.resolve(__dirname, '../public/tryon/three'), { maxAge: '30d', immutable: true }));   // three.js (3D try-on)
+  app.get(['/tryon/face-api.js', '/tryon/tryon.js', '/tryon/tryon3d.js'], (req, res) => res.sendFile(path.resolve(__dirname, '../public/tryon', path.basename(req.path)), { maxAge: req.path.endsWith('face-api.js') ? '7d' : 0 }));
   // Android APK download page at /download. The web app (iPhone, computers, any browser) is served at / below.
   app.use(siteRoutes);
 

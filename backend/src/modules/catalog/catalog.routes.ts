@@ -7,6 +7,8 @@ import { notFound } from '../../lib/errors';
 import { requireAuth } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
 import { cleanHex, framePNG, PLACEHOLDER_IMAGE } from '../../lib/frameArt';
+import { coatingSVG, lensArtPNG, lensTypeSVG } from '../../lib/lensArt';
+import { getBanners, liveBanners } from '../banners/banners';
 
 const r = Router();
 
@@ -27,6 +29,9 @@ const listQuery = z.object({
   minPrice: z.coerce.number().int().optional(),
   maxPrice: z.coerce.number().int().optional(),
   maxLensWidth: z.coerce.number().int().optional(),
+  brand: z.string().max(60).optional(),
+  color: z.string().max(40).optional(),
+  exclude: z.string().max(40).optional(),            // "Similar frames": leave out the one being viewed
   sort: z.enum(['popular', 'price_asc', 'price_desc', 'new']).default('popular'),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(50).default(20),
@@ -37,15 +42,22 @@ r.get('/products', validate(listQuery, 'query'), ah(async (req, res) => {
   const where: Prisma.ProductWhereInput = {
     isActive: true,
     shape: q.shape, material: q.material,
-    gender: q.gender ? { in: [q.gender, 'UNISEX'] } : undefined,
+    gender: q.gender === 'KIDS' ? 'KIDS' : q.gender ? { in: [q.gender, 'UNISEX'] } : undefined,   // kids: kids' frames only
     isSunglasses: q.sunglasses ? q.sunglasses === 'true' : undefined,
     basePrice: { gte: q.minPrice, lte: q.maxPrice },
     lensWidthMm: q.maxLensWidth ? { lte: q.maxLensWidth } : undefined,
-    variants: q.size ? { some: { size: q.size, stock: { gt: 0 } } } : undefined,
+    variants: q.size || q.color ? { some: {
+      ...(q.size ? { size: q.size, stock: { gt: 0 } } : {}),
+      ...(q.color ? { colorName: { contains: q.color, mode: 'insensitive' } } : {}),
+    } } : undefined,
+    brand: q.brand ? { equals: q.brand, mode: 'insensitive' } : undefined,
+    id: q.exclude ? { not: q.exclude } : undefined,
+    // Also find frames by stock code (SKU) in search.
     OR: q.q ? [
       { name: { contains: q.q, mode: 'insensitive' } },
       { brand: { contains: q.q, mode: 'insensitive' } },
       { description: { contains: q.q, mode: 'insensitive' } },
+      { variants: { some: { sku: { contains: q.q, mode: 'insensitive' } } } },
     ] : undefined,
   };
   const orderBy: Prisma.ProductOrderByWithRelationInput =
@@ -103,6 +115,75 @@ r.get('/products/:id/frame.png', ah(async (req, res) => {
   const hex = cleanHex(req.query.c) ?? cleanHex(p.variants[0]?.colorHex) ?? '#1B1F3B';
   const png = framePNG(p.id, p.updatedAt, p, hex, req.query.pad === '1');
   res.set({ 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' }).send(png);
+}));
+
+/** Home carousel: banners switched on in admin, inside their dates. */
+r.get('/banners', ah(async (_req, res) => { res.set('Cache-Control', 'public, max-age=60'); res.json(liveBanners(await getBanners())); }));
+
+/** Filter options that really exist in the shop (brands, colours with a swatch), for the Shop filters. */
+r.get('/facets', ah(async (_req, res) => {
+  const [brands, colours] = await Promise.all([
+    prisma.product.groupBy({ by: ['brand'], where: { isActive: true }, _count: { _all: true }, orderBy: { _count: { brand: 'desc' } } }),
+    prisma.frameVariant.findMany({ where: { product: { isActive: true } }, select: { colorName: true, colorHex: true } }),
+  ]);
+  const byName = new Map<string, { name: string; hex: string; count: number }>();
+  for (const c of colours) {
+    const base = c.colorName.split('/')[0].trim();                       // "Gold / Green lens" → "Gold"
+    const k = base.toLowerCase();
+    const e = byName.get(k) ?? { name: base, hex: c.colorHex, count: 0 }; e.count++; byName.set(k, e);
+  }
+  res.set('Cache-Control', 'public, max-age=300');
+  res.json({ brands: brands.map((b) => ({ name: b.brand, count: b._count._all })), colours: [...byName.values()].sort((a, b) => b.count - a.count).slice(0, 16) });
+}));
+
+/** Shape tiles (Home → Shop by frame shape): a drawn frame in that shape. */
+r.get('/shape-art/:shape.png', ah(async (req, res) => {
+  const shape = req.params.shape.toUpperCase();
+  if (!/^(RECTANGLE|ROUND|CAT_EYE|AVIATOR|WAYFARER|SQUARE|OVAL|GEOMETRIC)$/.test(shape)) throw notFound('Shape');
+  const spec = { shape, material: shape === 'ROUND' || shape === 'AVIATOR' || shape === 'OVAL' ? 'METAL' : 'ACETATE', isSunglasses: false, lensWidthMm: 52, bridgeMm: 18, frameWidthMm: 138 };
+  res.set({ 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' }).send(framePNG(`shape-${shape}`, new Date(0), spec as never, '#1B1F3B', true));
+}));
+
+/** Pictures for the lens choice screen: /lens-art/type/PROGRESSIVE.png, /lens-art/lens/SVD-160.png, /lens-art/coating/MIRROR.png */
+r.get('/lens-art/:kind/:code.png', ah(async (req, res) => {
+  const { kind, code } = req.params;
+  let key: string, draw: () => string;
+  if (kind === 'type') {
+    if (!/^[A-Z_]{3,40}$/.test(code)) throw notFound('Picture');
+    key = `type:${code}`; draw = () => lensTypeSVG(code);
+  } else if (kind === 'lens') {
+    const l = await prisma.lensPackage.findUnique({ where: { code } });
+    if (!l) throw notFound('Lens');
+    key = `lens:${l.code}:${l.lensType}:${l.index}:${l.name}`; draw = () => lensTypeSVG(l.lensType, Number(l.index), l.name);
+  } else if (kind === 'coating') {
+    const c = await prisma.coating.findUnique({ where: { code } });
+    if (!c) throw notFound('Coating');
+    key = `coat:${c.code}:${c.name}`; draw = () => coatingSVG(c.code, c.name);
+  } else throw notFound('Picture');
+  res.set({ 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' }).send(lensArtPNG(key, draw));
+}));
+
+/**
+ * 3D try-on model (GLB/glTF) for a frame, fetched by the server so the try-on page can load it under its
+ * security rules (it may only load files from this server). Cached in memory; 25 MB limit.
+ */
+const modelCache = new Map<string, { at: number; type: string; body: Buffer }>();
+r.get('/products/:id/model3d', ah(async (req, res) => {
+  const p = await prisma.product.findUnique({ where: { id: req.params.id }, select: { id: true, isActive: true, tryOn3d: true } });
+  const url = (p?.tryOn3d as { url?: string } | null)?.url;
+  if (!p || !p.isActive || !url || !/^https:\/\//.test(url)) throw notFound('3D model');
+  let hit = modelCache.get(url);
+  if (!hit || Date.now() - hit.at > 6 * 3600_000) {
+    const r2 = await fetch(url, { signal: AbortSignal.timeout(30_000) });
+    if (!r2.ok) throw notFound('3D model');
+    const body = Buffer.from(await r2.arrayBuffer());
+    if (body.length > 25 * 1024 * 1024) throw notFound('3D model');
+    const glb = body.subarray(0, 4).toString('latin1') === 'glTF';
+    hit = { at: Date.now(), type: glb ? 'model/gltf-binary' : 'model/gltf+json', body };
+    if (modelCache.size > 40) modelCache.delete(modelCache.keys().next().value as string);
+    modelCache.set(url, hit);
+  }
+  res.set({ 'Content-Type': hit.type, 'Cache-Control': 'public, max-age=3600' }).send(hit.body);
 }));
 
 r.get('/products/:id/tryon-image', ah(async (req, res) => {

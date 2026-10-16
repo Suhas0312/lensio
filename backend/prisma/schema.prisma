@@ -172,6 +172,7 @@ model Product {
   frameWidthMm Int
   weightGrams  Int?
   tryOnImage   String? // transparent PNG, front view, used for try-on overlay
+  tryOn3d      Json?   // 3D try-on: { url: GLB/glTF link, scale, offsetY, offsetZ, rotX } (optional calibration)
   instagramPostUrl String? // the Instagram post this frame came from (shown as "View on Instagram")
   isActive     Boolean        @default(true)
   rating       Float          @default(0)

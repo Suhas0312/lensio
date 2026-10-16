@@ -1,7 +1,6 @@
 import { ReactNode } from 'react';
 import {
-  ActivityIndicator, Pressable, ScrollView, StyleSheet, Text as RNText, TextInput, TextInputProps,
-  TextProps, View, ViewStyle, StyleProp, Platform } from 'react-native';
+  ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text as RNText, TextInput, TextInputProps, TextProps, View, ViewStyle, StyleProp, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, gradient, radius, space, type } from '@/theme';
@@ -61,13 +60,14 @@ export function Chip({ label, selected, onPress }: { label: string; selected?: b
 }
 
 /** A selectable row used across the lens flow. */
-export function OptionCard({ title, subtitle, price, selected, onPress, badge }: {
-  title: string; subtitle?: string; price?: string; selected?: boolean; onPress?: () => void; badge?: string;
+export function OptionCard({ title, subtitle, price, selected, onPress, badge, image }: {
+  title: string; subtitle?: string; price?: string; selected?: boolean; onPress?: () => void; badge?: string; image?: string;
 }) {
   return (
     <Pressable onPress={onPress} accessibilityRole="radio" accessibilityState={{ checked: !!selected }}
       style={[s.card, selected && { borderColor: colors.violet }]}>
       <View style={[s.radio, selected && { borderColor: colors.violet }]}>{selected ? <View style={s.radioDot} /> : null}</View>
+      {image ? <Image source={{ uri: image }} style={{ width: 72, height: 48, borderRadius: 8 }} resizeMode="cover" accessibilityIgnoresInvertColors /> : null}
       <View style={{ flex: 1, gap: 2 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space(2) }}>
           <Text v="bodyStrong">{title}</Text>

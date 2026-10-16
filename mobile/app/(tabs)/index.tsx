@@ -17,12 +17,15 @@ import { Row, Text } from '@/components/UI';
 import { colors, gradient, radius, space } from '@/theme';
 import { useAppUpdate } from '@/lib/appUpdate';
 import { useFeatures } from '@/lib/features';
+import { Collections, HomeBanners, RecentlyViewed, ShopByFace, ShopByShape } from '@/components/HomeSections';
+import { DesktopNav, ShopByOccasion } from '@/components/Discovery';
 
 const SHAPES = [['RECTANGLE', 'Rectangle'], ['ROUND', 'Round'], ['CAT_EYE', 'Cat-eye'], ['AVIATOR', 'Aviator'], ['WAYFARER', 'Wayfarer'], ['SQUARE', 'Square']];
 
 export default function Home() {
   const features = useFeatures();
-  const { cardW, cols, wide, pad } = useLayout();
+  const { cardW, cols, wide, pad, content } = useLayout();
+  const contentW = content - pad * 2;   // banner carousel width
   const [bestsellers, setBestsellers] = useState<Product[]>([]);
   const [newest, setNewest] = useState<Product[]>([]);
   const user = useAuth((st) => st.user);
@@ -95,8 +98,11 @@ export default function Home() {
             <View style={{ flex: 1 }}><Text v="bodyStrong">Update available: version {update.version}</Text><Text v="caption" color={colors.muted}>Tap to update. Your account and orders stay.</Text></View>
           </Pressable>
         ) : null}
+        <HomeBanners width={contentW} />
         <ScanHero />
         <FeatureTiles />
+        <DesktopNav />
+        <Collections />
         {/* Hero: the one place the brand gradient gets room to breathe */}
         <LinearGradient colors={gradient as unknown as string[]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ borderRadius: radius.lg, padding: 1.5 }}>
           <View style={{ backgroundColor: colors.surface, borderRadius: radius.lg - 1.5, padding: wide ? space(8) : space(5), gap: space(3) }}>
@@ -138,6 +144,11 @@ export default function Home() {
             </Pressable>
           ))}
         </View>
+
+        <ShopByShape />
+        <ShopByFace />
+        <ShopByOccasion />
+        <RecentlyViewed />
 
         {newest.length ? (
           <View style={{ gap: space(3) }}>

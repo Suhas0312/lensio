@@ -8,8 +8,9 @@ const tx = {
   productImage: { createMany: async ({ data }: any) => { db.images.push(...data); } },
 };
 vi.mock('../../lib/prisma', () => ({ prisma: {
-  product: { findMany: async ({ where }: any) => where.slug.in.filter((s: string) => db.products.has(s)).map((slug: string) => ({ slug })) },
-  lensPackage: { findMany: async () => [...db.lenses.keys()].map((code) => ({ code })), upsert: async ({ where, create }: any) => db.lenses.set(where.code, create) },
+  product: { findMany: async ({ where }: any) => where.slug.in.filter((s: string) => db.products.has(s)).map((slug: string) => ({ slug })),
+    findUnique: async ({ where }: any) => (db.products.has(where.slug) ? { id: 'x' } : null) },
+  lensPackage: { findMany: async () => [...db.lenses.keys()].map((code) => ({ code })), findUnique: async ({ where }: any) => (db.lenses.has(where.code) ? { id: 'x' } : null), upsert: async ({ where, create }: any) => db.lenses.set(where.code, create) },
   coating: { findMany: async () => [], upsert: async ({ where, create }: any) => db.coatings.set(where.code, create) },
   $transaction: async (fn: any) => fn(tx),
 } }));
@@ -87,5 +88,38 @@ describe('library files and options', () => {
     const fs = await import('fs');
     await importCatalog('frames', fs.readFileSync('../docs/catalog/lensio-design-library.csv', 'utf8'), false);
     expect([...db.products.values()].every((p) => p.isActive === false)).toBe(true);
+  });
+});
+
+describe('items that already exist: replace, keep both or skip', () => {
+  const csv = 'name,shape,material,price,lens_width,bridge,temple,colour\nVista Rectangle,rectangle,acetate,1999,52,18,140,Black\nBrand New,round,metal,999,50,18,140,Gold\n';
+  beforeEach(async () => { await importCatalog('frames', csv.split('\n').slice(0, 2).join('\n').replace('1999', '1799'), false); });   // only Vista is in the shop
+  it('“Check file” lists what already exists', async () => {
+    const r = await importCatalog('frames', csv, true);
+    expect(r.existing).toEqual([{ key: 'vista-rectangle', name: 'Vista Rectangle', row: 2 }]);
+  });
+  it('replace updates the existing frame', async () => {
+    const r = await importCatalog('frames', csv, false, { onExisting: 'replace' });
+    expect(r).toMatchObject({ created: 1, updated: 1 });           // Brand New is new, Vista is updated
+    expect(db.products.get('vista-rectangle').basePrice).toBe(199900);
+  });
+  it('skip leaves the existing frame as it was', async () => {
+    const r = await importCatalog('frames', csv, false, { onExisting: 'skip' });
+    expect(r.updated).toBe(0); expect(r.skipped).toBeGreaterThanOrEqual(1);
+    expect(db.products.get('vista-rectangle').basePrice).toBe(179900);
+  });
+  it('keep both adds a copy with its own name, link and stock codes', async () => {
+    const r = await importCatalog('frames', csv, false, { onExisting: 'skip', choices: { 'vista-rectangle': 'both' } });
+    expect(r.copies).toBe(1);
+    expect(db.products.get('vista-rectangle-2')).toMatchObject({ name: 'Vista Rectangle (2)', basePrice: 199900 });
+    expect(db.products.get('vista-rectangle').basePrice).toBe(179900);
+    expect([...db.variants.keys()].some((k) => k.endsWith('-2'))).toBe(true);
+  });
+  it('works for lenses too', async () => {
+    db.lenses.set('SVD-156', {});
+    const lcsv = 'code,name,type,index,price,max_sph\nSVD-156,Everyday,single vision,1.56,0,4\n';
+    expect((await importCatalog('lenses', lcsv, true)).existing.map((e) => e.key)).toEqual(['SVD-156']);
+    await importCatalog('lenses', lcsv, false, { onExisting: 'both' });
+    expect(db.lenses.get('SVD-156_2')).toMatchObject({ name: 'Everyday (2)' });
   });
 });
