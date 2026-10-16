@@ -1,7 +1,8 @@
-# Automatic Android release.
-# Every change you upload to the mobile/ folder (or a manual run from the Actions tab):
-#   1. picks the next version (2.0.2 → 2.0.3), 2. builds the APK on Expo,
-#   3. publishes a GitHub release with lensio.apk.
+# Android release, only when YOU raise the version.
+# A release is built when "version" in mobile/app.json is higher than the newest release (e.g. 3.3.0 → 3.4.0).
+# Small fixes uploaded without changing the version do NOT create a new app version.
+# Manual run (Actions tab → Run workflow) can force a release; it then uses the next patch number.
+#   1. builds the APK on Expo, 2. publishes a GitHub release with lensio.apk.
 # Lensio's server checks this repo's newest release every few minutes, so /download, /download/lensio.apk
 # and the in-app "Update available" window switch to it automatically. No admin step needed.
 #
@@ -18,6 +19,10 @@ on:
       notes:
         description: "What's new (shown to customers). Leave empty for a default note."
         required: false
+      force:
+        description: "Release even if the version in mobile/app.json was not raised (uses the next patch number)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -54,11 +59,29 @@ jobs:
             exit 1
           fi
 
-      - name: Pick the next version
+      - name: Has the version been raised?
+        id: gate
+        env:
+          FORCE: ${{ github.event.inputs.force }}
+        run: |
+          want=$(node -p "require('./app.json').expo.version")
+          latest=$(git tag -l 'v*' | sed 's/^v//' | sort -V | tail -1)
+          newest=$(printf '%s\n%s\n' "$want" "${latest:-0.0.0}" | sort -V | tail -1)
+          if [ "$FORCE" = "true" ] || { [ "$want" != "$latest" ] && [ "$newest" = "$want" ]; }; then
+            echo "release=yes" >> "$GITHUB_OUTPUT"; echo "Releasing (app.json $want, newest release ${latest:-none})"
+          else
+            echo "release=no" >> "$GITHUB_OUTPUT"
+            echo "### No new app version" >> "$GITHUB_STEP_SUMMARY"
+            echo "mobile/app.json says $want and release v$latest already exists. Raise the version in mobile/app.json to publish a new app." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Pick the version
         id: ver
+        if: steps.gate.outputs.release == 'yes'
         run: node scripts/next-version.js
 
       - name: What's new
+        if: steps.gate.outputs.release == 'yes'
         id: notes
         env:
           INPUT_NOTES: ${{ github.event.inputs.notes }}
@@ -74,12 +97,15 @@ jobs:
           { echo "text<<NOTES_EOF"; echo "$notes"; echo "NOTES_EOF"; } >> "$GITHUB_OUTPUT"
 
       - name: Install app packages
+        if: steps.gate.outputs.release == 'yes'
         run: npm ci --no-audit --no-fund
 
       - name: Build the APK on Expo (10-40 minutes)
+        if: steps.gate.outputs.release == 'yes'
         run: npx --yes eas-cli@16 build -p android --profile preview --non-interactive --wait --json > build.json
 
       - name: Download the APK
+        if: steps.gate.outputs.release == 'yes'
         run: |
           url=$(node -e "const b=JSON.parse(require('fs').readFileSync('build.json','utf8'));const x=Array.isArray(b)?b[0]:b;process.stdout.write((x&&x.artifacts&&(x.artifacts.applicationArchiveUrl||x.artifacts.buildUrl))||'')")
           if [ -z "$url" ]; then echo "::error::Expo did not return an APK link"; cat build.json; exit 1; fi
@@ -87,6 +113,7 @@ jobs:
           ls -la lensio.apk
 
       - name: Publish the GitHub release
+        if: steps.gate.outputs.release == 'yes'
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.ver.outputs.version }}
