@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { createElement, useEffect, useRef, useState } from 'react';
+import { WebView } from 'react-native-webview';
 import { Image, Linking, NativeScrollEvent, NativeSyntheticEvent, Platform, Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -12,7 +13,24 @@ import { colors, gradient, radius, space } from '@/theme';
 const open = (link: string) => { if (!link) return; if (link.startsWith('/')) router.push(link as never); else Linking.openURL(link); };
 const glass = { backgroundColor: 'rgba(21,27,77,0.62)', borderWidth: 1, borderColor: 'rgba(160,170,255,0.16)', borderRadius: radius.md } as const;
 
-interface Banner { id: string; title: string; text: string; cta: string; link: string; imageDesktop: string | null; imageMobile: string | null; alt: string }
+interface Banner { id: string; title: string; text: string; cta: string; link: string; imageDesktop: string | null; imageMobile: string | null; alt: string; videoDesktop?: string | null; videoMobile?: string | null }
+
+/** Silent looping banner video: the browser's <video> on the website, a WebView in the app (no extra native module). */
+function BannerVideo({ src, poster }: { src: string; poster?: string | null }) {
+  const fill = { position: 'absolute' as const, width: '100%' as const, height: '100%' as const };
+  if (Platform.OS === 'web') {
+    return createElement('video', { src, poster: poster ?? undefined, autoPlay: true, muted: true, loop: true, playsInline: true, preload: 'auto',
+      'aria-hidden': true, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' } });
+  }
+  const html = `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;height:100%;background:#040722;overflow:hidden}video{width:100%;height:100%;object-fit:cover}</style></head>
+    <body><video src="${src.replace(/"/g, '')}" ${poster ? `poster="${poster.replace(/"/g, '')}"` : ''} autoplay muted loop playsinline></video></body></html>`;
+  return (
+    <View pointerEvents="none" style={fill}>
+      <WebView source={{ html }} style={{ flex: 1, backgroundColor: 'transparent' }} originWhitelist={['*']} scrollEnabled={false}
+        mediaPlaybackRequiresUserAction={false} allowsInlineMediaPlayback javaScriptEnabled={false} />
+    </View>
+  );
+}
 
 /** Rotating home banners from admin → Banners (desktop / mobile images, text, button). Hidden when there are none. */
 export function HomeBanners({ width }: { width: number }) {
@@ -22,25 +40,33 @@ export function HomeBanners({ width }: { width: number }) {
   const { width: screen } = useWindowDimensions();
   const wide = screen >= 700;
   useEffect(() => { cachedApi<Banner[]>('/catalog/banners', setList).then(setList).catch(() => {}); }, []);
+  const goTo = (n: number) => { const k = (n + list.length) % list.length; setI(k); ref.current?.scrollTo({ x: k * width, animated: true }); };
+  const [pausedAt, setPausedAt] = useState(0);   // a swipe or arrow tap pauses the automatic change for a while
+  // Auto-advance one by one: images every 5.5 s, video banners stay 9 s so the clip can play.
   useEffect(() => {
     if (list.length < 2) return;
-    const t = setInterval(() => setI((n) => { const next = (n + 1) % list.length; ref.current?.scrollTo({ x: next * width, animated: true }); return next; }), 5500);
-    return () => clearInterval(t);
-  }, [list.length, width]);
+    const b = list[i];
+    const hasVideo = !!(b && (b.videoDesktop || b.videoMobile));
+    const wait = Math.max(hasVideo ? 9000 : 5500, pausedAt + 12000 - Date.now());
+    const t = setTimeout(() => goTo(i + 1), wait);
+    return () => clearTimeout(t);
+  }, [list, i, width, pausedAt]);
   if (!list.length || width <= 0) return null;
   const h = wide ? Math.round(width / 2.67) : Math.round(width * 0.62);
-  const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => setI(Math.round(e.nativeEvent.contentOffset.x / width));
+  const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => { const k = Math.round(e.nativeEvent.contentOffset.x / width); if (k !== i) { setI(k); setPausedAt(Date.now()); } };
   return (
-    <View style={{ gap: space(2) }}>
+    <View style={{ gap: space(2), position: 'relative' }}>
       <ScrollView ref={ref} horizontal pagingEnabled showsHorizontalScrollIndicator={false} onMomentumScrollEnd={onScroll} onScroll={Platform.OS === 'web' ? onScroll : undefined} scrollEventThrottle={64}
         style={{ width, borderRadius: radius.lg }} accessibilityLabel="Offers and collections">
-        {list.map((b) => {
+        {list.map((b, k) => {
           const img = (wide ? b.imageDesktop : b.imageMobile) || b.imageDesktop || b.imageMobile;
+          const vid = (wide ? b.videoDesktop : b.videoMobile) || b.videoDesktop || b.videoMobile;
           return (
             <Pressable key={b.id} onPress={() => open(b.link)} accessibilityRole={b.link ? 'link' : undefined} accessibilityLabel={b.alt || b.title}
               style={{ width, height: h, borderRadius: radius.lg, overflow: 'hidden' }}>
               {img ? <Image source={{ uri: img }} style={{ position: 'absolute', width: '100%', height: '100%' }} resizeMode="cover" accessibilityIgnoresInvertColors />
                 : <LinearGradient colors={[...gradient]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ position: 'absolute', width: '100%', height: '100%' }} />}
+              {vid && k === i ? <BannerVideo src={vid} poster={img} /> : null}
               <LinearGradient colors={['transparent', 'rgba(4,7,34,0.78)']} style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: '70%' }} />
               <View style={{ position: 'absolute', left: space(5), right: space(5), bottom: space(5), gap: space(1) }}>
                 <Text v="title" color="#fff">{b.title}</Text>
@@ -51,7 +77,17 @@ export function HomeBanners({ width }: { width: number }) {
           );
         })}
       </ScrollView>
-      {list.length > 1 ? <Row style={{ justifyContent: 'center', gap: 6 }}>{list.map((b, k) => <View key={b.id} style={{ width: k === i ? 18 : 7, height: 7, borderRadius: 4, backgroundColor: k === i ? colors.cyan : colors.line }} />)}</Row> : null}
+      {list.length > 1 && wide ? (['‹', '›'] as const).map((a, d) => (
+        <Pressable key={a} onPress={() => { setPausedAt(Date.now()); goTo(i + (d ? 1 : -1)); }} accessibilityRole="button" accessibilityLabel={d ? 'Next banner' : 'Previous banner'}
+          style={{ position: 'absolute', top: h / 2 - 22, [d ? 'right' : 'left']: space(3), width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(4,7,34,0.55)', alignItems: 'center', justifyContent: 'center' }}>
+          <Text v="title" color="#fff">{a}</Text>
+        </Pressable>
+      )) : null}
+      {list.length > 1 ? <Row style={{ justifyContent: 'center', gap: 6 }}>{list.map((b, k) => (
+        <Pressable key={b.id} onPress={() => { setPausedAt(Date.now()); goTo(k); }} hitSlop={6} accessibilityRole="button" accessibilityLabel={`Banner ${k + 1} of ${list.length}`}>
+          <View style={{ width: k === i ? 18 : 7, height: 7, borderRadius: 4, backgroundColor: k === i ? colors.cyan : colors.line }} />
+        </Pressable>
+      ))}</Row> : null}
     </View>
   );
 }

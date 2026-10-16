@@ -737,7 +737,8 @@
     const card = (b, i) => `<div class="card" style="display:grid;gap:10px">
       <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start">
         <div style="width:260px;max-width:100%;aspect-ratio:2.4;border-radius:14px;overflow:hidden;background:linear-gradient(120deg,#08B9DB,#7B61FF,#C94EF2);position:relative;flex:none">
-          ${b.imageDesktop ? `<img src="${esc(b.imageDesktop)}" alt="" style="width:100%;height:100%;object-fit:cover">` : ''}
+          ${b.videoDesktop ? `<video src="${esc(b.videoDesktop)}" ${b.imageDesktop ? `poster="${esc(b.imageDesktop)}"` : ''} autoplay muted loop playsinline style="width:100%;height:100%;object-fit:cover"></video>`
+            : b.imageDesktop ? `<img src="${esc(b.imageDesktop)}" alt="" style="width:100%;height:100%;object-fit:cover">` : ''}
           <div style="position:absolute;left:12px;bottom:10px;right:12px;color:#fff;text-shadow:0 1px 6px rgba(0,0,0,.5)"><b>${esc(b.title || 'Headline')}</b><div class="small">${esc(b.text || '')}</div></div>
         </div>
         <div style="flex:1;min-width:240px;display:grid;gap:8px">
@@ -751,7 +752,14 @@
         <button class="btn" data-act="banImg" data-i="${i}" data-k="imageDesktop">🖥 ${b.imageDesktop ? 'Change' : 'Add'} desktop image</button>
         <button class="btn" data-act="banImg" data-i="${i}" data-k="imageMobile">📱 ${b.imageMobile ? 'Change' : 'Add'} mobile image</button>
         ${b.imageMobile ? `<img src="${esc(b.imageMobile)}" alt="" style="height:40px;border-radius:6px">` : ''}
-        <label class="small" style="flex:1;min-width:200px">Image description (for screen readers)<input data-bf="${i}:alt" value="${esc(b.alt || '')}" maxlength="160"></label>
+        <label class="small" style="flex:1;min-width:200px">Picture description (for screen readers)<input data-bf="${i}:alt" value="${esc(b.alt || '')}" maxlength="160"></label>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <button class="btn" data-act="banVid" data-i="${i}" data-k="videoDesktop">🎬 ${b.videoDesktop ? 'Change' : 'Add'} desktop video</button>
+        ${b.videoDesktop ? `<button class="link" data-act="banVidDel" data-i="${i}" data-k="videoDesktop" title="Remove desktop video">✕</button>` : ''}
+        <button class="btn" data-act="banVid" data-i="${i}" data-k="videoMobile">🎬 ${b.videoMobile ? 'Change' : 'Add'} mobile video</button>
+        ${b.videoMobile ? `<video src="${esc(b.videoMobile)}" muted autoplay loop playsinline style="height:40px;border-radius:6px"></video><button class="link" data-act="banVidDel" data-i="${i}" data-k="videoMobile" title="Remove mobile video">✕</button>` : ''}
+        <span class="small muted">Optional: a short silent MP4 (5–15 s, under 25 MB) plays on a loop instead of the image. Keep the images too: they show while the video loads.</span>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center" class="small">
         <label class="check"><input type="checkbox" data-bf="${i}:visible" ${b.visible ? 'checked' : ''}> <span>Visible</span></label>
@@ -763,9 +771,10 @@
         <button class="link" style="color:#f87171" data-act="banDel" data-i="${i}">🗑 Remove</button>
       </div></div>`;
     return shell(`<div class="bar"><h1 class="grow">Home banners</h1><button class="btn" data-act="banAdd">+ Add banner</button><button class="btn p" data-act="banSave">Save banners</button></div>
-      <p class="small muted">Banners rotate at the top of Home in the app and website. Best image sizes: desktop 1600 × 600, mobile 900 × 900 (JPG/PNG/WebP, under 5 MB). Without an image, the banner shows your brand gradient with the headline. Only real offers, please: customers can see them.</p>
+      <p class="small muted">Banners rotate at the top of Home in the app and website. Best sizes: desktop 1600 × 600, mobile 900 × 560 (images: JPG/PNG/WebP under 5 MB; videos: MP4 under 25 MB, same shapes). Banners slide automatically; video banners stay until the clip has played. Without an image, the banner shows your brand gradient with the headline. Only real offers, please: customers can see them.</p>
       ${list.length ? list.map(card).join('') : '<div class="card"><p>No banners yet. Tap <b>+ Add banner</b>. Until you add some, Home shows its usual sections.</p></div>'}
-      <input type="file" id="banFile" accept="image/jpeg,image/png,image/webp" hidden>`);
+      <input type="file" id="banFile" accept="image/jpeg,image/png,image/webp" hidden>
+      <input type="file" id="banVidFile" accept="video/mp4,video/webm" hidden>`);
   }
 
   function render() {
@@ -1015,6 +1024,8 @@
       if (act === 'banAdd') { S.data.banners.push({ id: 'b' + Date.now().toString(36), title: 'New banner', text: '', cta: 'Shop now', link: '/shop', imageDesktop: null, imageMobile: null, alt: '', visible: false, startsAt: null, endsAt: null }); return render(); }
       if (act === 'banDel') { if (!confirm('Remove this banner?')) return; S.data.banners.splice(+el.dataset.i, 1); return render(); }
       if (act === 'banMove') { const i = +el.dataset.i, j = i + +el.dataset.d, l = S.data.banners; [l[i], l[j]] = [l[j], l[i]]; return render(); }
+      if (act === 'banVid') { S.banTarget = { i: +el.dataset.i, k: el.dataset.k }; return $('#banVidFile').click(); }
+      if (act === 'banVidDel') { S.data.banners[+el.dataset.i][el.dataset.k] = null; toast('Video removed: tap Save banners'); return render(); }
       if (act === 'banImg') { S.banTarget = { i: +el.dataset.i, k: el.dataset.k }; return $('#banFile').click(); }
       if (act === 'banSave') {
         el.disabled = true;
@@ -1235,6 +1246,17 @@
         b[k] = t.type === 'checkbox' ? t.checked : t.type === 'datetime-local' ? (t.value ? new Date(t.value).toISOString() : null) : t.value;
         if (k === 'visible') render();
         return;
+      }
+      if (t.id === 'banVidFile') {
+        const f = t.files[0]; t.value = ''; if (!f || !S.banTarget) return;
+        if (!/^video\/(mp4|webm)$/.test(f.type)) return toast('Use an MP4 or WebM video');
+        if (f.size > 25 * 1024 * 1024) return toast(`${f.name} is over 25 MB: export a shorter or smaller MP4`);
+        const fd = new FormData(); fd.append('file', f);
+        try {
+          toast(`Uploading ${f.name}…`);
+          const { url } = await api('/admin/uploads/video', { form: fd });
+          S.data.banners[S.banTarget.i][S.banTarget.k] = url; toast('Video added: tap Save banners'); return render();
+        } catch (e) { return toast(e.message); }
       }
       if (t.id === 'banFile') {
         const f = t.files[0]; t.value = ''; if (!f || !S.banTarget) return;

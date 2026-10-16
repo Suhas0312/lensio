@@ -240,6 +240,20 @@ const imageUpload = multer({
 });
 
 /** Upload one product photo or try-on PNG. Returns its public URL to put in the product. */
+/** Banner videos: MP4 or WebM, up to 25 MB (short, silent loops). */
+const videoUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 25 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (['video/mp4', 'video/webm'].includes(file.mimetype)) cb(null, true);
+    else cb(badRequest('BAD_FILE_TYPE', 'Upload an MP4 or WebM video'));
+  },
+});
+r.post('/uploads/video', adminOnly, videoUpload.single('file'), ah(async (req, res) => {
+  if (!req.file) throw badRequest('NO_FILE', 'Choose a video to upload');
+  res.status(201).json({ url: await putPublicFile('banners', req.file.buffer, req.file.mimetype) });
+}));
+
 r.post('/uploads', adminOnly, imageUpload.single('file'), ah(async (req, res) => {
   if (!req.file) throw badRequest('NO_FILE', 'Choose an image to upload');
   const folder = req.body.kind === 'tryon' ? 'tryon' : req.body.kind === 'settings' ? 'settings' : req.body.kind === 'banners' ? 'banners' : req.body.kind === 'models' ? 'models' : 'products';

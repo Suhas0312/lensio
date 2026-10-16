@@ -15,6 +15,10 @@ export const bannerSchema = z.object({
   imageDesktop: z.string().url().nullable().optional().default(null),
   imageMobile: z.string().url().nullable().optional().default(null),
   alt: z.string().trim().max(160).optional().default(''),
+  // Optional video (MP4/WebM, https). Plays silently on a loop; the images are shown while it loads and
+  // wherever video can't play, so a banner with a video should still have images.
+  videoDesktop: z.string().url().refine((u) => /^https:\/\//.test(u), 'Use an https link').nullable().optional().default(null),
+  videoMobile: z.string().url().refine((u) => /^https:\/\//.test(u), 'Use an https link').nullable().optional().default(null),
   visible: z.boolean().default(true),
   startsAt: z.string().datetime().nullable().optional().default(null),
   endsAt: z.string().datetime().nullable().optional().default(null),

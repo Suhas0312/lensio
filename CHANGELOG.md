@@ -9,6 +9,11 @@ Server versions are shown in `/v1/config` and the admin header. App versions are
 - **← Back on every screen:** all screens with a header (product, cart, checkout, wishlist, compare, Ask Lensio, orders, eye test, stores, rewards…), the Shop/Orders/Account tabs and the sign-in screen. Goes to the previous screen, or Home when a page was opened directly from a link. Try-on's ← now works when opened from the tab bar. Tested on 12 screens.
 - **Ask Lensio greetings:** understands “Hlo”, “helo”, “hii”, “hai”, “heyy”, “Namaskara”, “good morning” and similar.
 
+## 3.6.0 · Video banners
+- **Banners can be images or videos:** Admin → Banners → 🎬 Add desktop / mobile video (MP4 or WebM, up to 25 MB). Videos play silently on a loop (website: built-in player; app: WebView, no new native module); the images show while a video loads.
+- **Carousel:** changes one by one automatically (images 5.5 s, video banners 9 s), swipe on phones, ‹ › arrows on computers, tap a dot to jump; pauses 12 s after you swipe or tap. Only the banner on screen plays its video (saves data).
+- Clearer “file too large” messages (images 5 MB, videos 25 MB).
+
 ## 3.5.0 · Shopping experience + 2D/3D try-on (app, website, admin)
 - **Home banners** (Admin → Banners): rotating carousel with desktop and mobile images, headline, text, button, link, visibility, start/end dates, order. Brand-gradient banners when no image. Only real offers.
 - **Home discovery** (existing sections kept): Collections (Men, Women, Kids, Eyeglasses, Sunglasses, Titanium), Shop by frame shape, Shop by face shape (with AI face-scan shortcut), Recently viewed.

@@ -18,7 +18,7 @@ const s3 = env.STORAGE_DRIVER === 's3'
     })
   : null;
 
-const EXT: Record<string, string> = {
+const EXT: Record<string, string> = { 'video/mp4': 'mp4', 'video/webm': 'webm',
   'image/jpeg': 'jpg', 'image/png': 'png', 'image/heic': 'heic', 'image/webp': 'webp', 'application/pdf': 'pdf',
 };
 
