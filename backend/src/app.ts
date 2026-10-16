@@ -82,14 +82,14 @@ export function createApp() {
         supportWhatsApp: env.SUPPORT_WHATSAPP_NUMBER,
         razorpayKeyId: env.RAZORPAY_KEY_ID ?? null,
         payments: { razorpay: !!(env.RAZORPAY_KEY_ID && env.RAZORPAY_KEY_SECRET), upiManual: upiManualAvailable(s), cod: s.codEnabled },
-        features: { eyeTest: s.eyeTestEnabled },
+        features: { eyeTest: s.eyeTestEnabled, stores: s.storesEnabled, tryOn2d: s.tryOn2d, tryOn3d: s.tryOn3d, assistant: s.assistantEnabled },
         app: { androidApkUrl: rel.apkUrl, latestVersion: rel.version, minVersion: rel.minVersion, notes: rel.notes },
         instagramUrl: s.instagramUrl,
         auth: { phoneOtp: whatsappEnabled() || smsEnabled(), otpWhatsApp: whatsappEnabled(), otpSms: smsEnabled(), emailCode: true, password: true },
         loyalty: { enabled: s.loyaltyEnabled, pointsPer100: s.loyaltyPointsPer100, maxRedeemPercent: s.loyaltyMaxRedeemPercent, pointValueRupees: 1 },
         firstOrderCoupon: 'FIRST10',
         assistantAi: !!(env.GEMINI_API_KEY || env.GEMINI_API_KEY_2),
-        version: '3.6.0',
+        version: '3.7.0',
       });
     } catch (e) { next(e); }
   });

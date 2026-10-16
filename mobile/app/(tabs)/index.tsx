@@ -136,7 +136,7 @@ export default function Home() {
             ...(features.eyeTest ? [{ icon: 'home-outline' as const, t: 'Eye test at home', to: '/eye-test' }] : []),
             { icon: 'document-text-outline' as const, t: 'Upload prescription', to: '/prescription/new' },
             { icon: 'scan-outline' as const, t: 'Try frames on', to: '/tryon' },
-            { icon: 'location-outline' as const, t: 'Find a store', to: '/stores' },
+            ...(features.stores ? [{ icon: 'location-outline' as const, t: 'Find a store', to: '/stores' }] : []),
           ].map((c) => (
             <Pressable key={c.t} onPress={() => router.push(c.to)} style={{ flexGrow: 1, flexBasis: wide ? '22%' : '45%', backgroundColor: colors.surface, borderRadius: radius.md, padding: space(4), gap: space(2), borderWidth: 1, borderColor: colors.line }}>
               <Ionicons name={c.icon} size={22} color={colors.cyan} />

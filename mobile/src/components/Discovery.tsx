@@ -3,6 +3,7 @@ import { Platform, Pressable, ScrollView, View, useWindowDimensions } from 'reac
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, radius, space } from '@/theme';
+import { useFeatures } from '@/lib/features';
 import { Text } from './UI';
 
 const glass = { borderRadius: radius.md, borderWidth: 1, borderColor: 'rgba(160,170,255,0.16)', backgroundColor: 'rgba(21,27,77,0.62)' } as const;
@@ -44,6 +45,7 @@ const SHAPES: [string, string][] = [['RECTANGLE', 'Rectangle'], ['ROUND', 'Round
 export function DesktopNav() {
   const { width } = useWindowDimensions();
   const [shapesOpen, setShapesOpen] = useState(false);
+  const { stores } = useFeatures();
   if (width < 900) return null;
   const shop = (params: Params) => { setShapesOpen(false); router.push({ pathname: '/shop', params }); };
   const link = (label: string, onPress: () => void, icon?: keyof typeof Ionicons.glyphMap) => (
@@ -71,7 +73,7 @@ export function DesktopNav() {
       {link('Try on', () => router.push('/tryon'), 'scan-outline')}
       {link('Compare', () => router.push('/compare'), 'git-compare-outline')}
       {link('Wishlist', () => router.push('/wishlist'), 'heart-outline')}
-      {link('Stores', () => router.push('/stores'), 'location-outline')}
+      {stores ? link('Stores', () => router.push('/stores'), 'location-outline') : null}
     </View>
   );
 }

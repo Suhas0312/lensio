@@ -13,10 +13,11 @@ import { orderInclude, transition } from '../orders/orders.service';
 import { STATUS_LABEL } from '../notifications/whatsapp.service';
 import { androidRelease } from '../settings/appRelease';
 import { testGeminiKeys } from '../assistant/assistant.service';
+import { alertRecipients } from '../notifications/owner.service';
 import { importCatalog, Kind, TEMPLATES } from '../catalogImport/import.service';
 import { bannerSchema, getBanners, saveBanners } from '../banners/banners';
 import { getSettings, saveSettings } from '../settings/settings.service';
-import { sendMail } from '../../lib/mail';
+import { mailEnabled, sendMail } from '../../lib/mail';
 import { notifyEyeTest, notifyOrderUpdate } from '../notifications/whatsapp.service';
 import { shiprocketEnabled } from '../shipping/shiprocket.service';
 import { recomputeProductRating } from '../reviews/reviews.routes';
@@ -470,6 +471,16 @@ r.get('/settings', ah(async (_req, res) => { res.json(await getSettings()); }));
 /** Settings → "Test AI keys" for Ask Lensio. */
 r.post('/assistant/test', ah(async (_req, res) => { res.json({ keys: await testGeminiKeys() }); }));
 
+/** Settings → "Send test email": checks the email service and where order alerts go. */
+r.post('/settings/test-email', adminOnly, ah(async (_req, res) => {
+  const s = await getSettings();
+  const to = alertRecipients(s.alertEmails);
+  const configured = mailEnabled();
+  if (!configured || !to.length) return res.json({ configured, recipients: to, sent: [] as string[], failed: [] as string[] });
+  const results = await Promise.all(to.map(async (addr) => ({ addr, ok: await sendMail(addr, '✅ Lensio test email', 'This is a test from your Lensio admin panel. New-order alerts will arrive at this address.') })));
+  res.json({ configured, recipients: to, sent: results.filter((r) => r.ok).map((r) => r.addr), failed: results.filter((r) => !r.ok).map((r) => r.addr), alertsOn: s.ownerEmailAlerts });
+}));
+
 /** Frames → Bulk import: thousands of frames / lenses / coatings from a CSV. dryRun = "Check file" only. */
 r.get('/import/template/:kind', adminOnly, ah(async (req, res) => {
   const kind = req.params.kind as Kind;
@@ -499,7 +510,9 @@ r.put('/settings', adminOnly, validate(z.object({
   shopInfo: z.string().max(4000).nullable().optional(),
   instagramUrl: z.string().trim().url('Paste your full Instagram link').nullable().optional().or(z.literal('').transform(() => null)),
   ownerEmailAlerts: z.boolean().optional(), autoStartLensWork: z.boolean().optional(),
-  autoApproveTypedRx: z.boolean().optional(), frameOnlyToQc: z.boolean().optional(), eyeTestEnabled: z.boolean().optional(),
+  autoApproveTypedRx: z.boolean().optional(), frameOnlyToQc: z.boolean().optional(), eyeTestEnabled: z.boolean().optional(), storesEnabled: z.boolean().optional(),
+  tryOn2d: z.boolean().optional(), tryOn3d: z.boolean().optional(), assistantEnabled: z.boolean().optional(),
+  alertEmails: z.string().trim().max(500).refine((v) => !v || v.split(',').map((e) => e.trim()).filter(Boolean).every((e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)), 'Enter email addresses separated by commas').optional(),
   androidLatestVersion: z.string().trim().regex(/^\d+\.\d+\.\d+$/, 'Version looks like 1.0.1').nullable().optional().or(z.literal('').transform(() => null)),
   androidMinVersion: z.string().trim().regex(/^\d+\.\d+\.\d+$/, 'Minimum version looks like 1.0.1').nullable().optional().or(z.literal('').transform(() => null)),
   androidUpdateNotes: z.string().trim().max(600).nullable().optional().or(z.literal('').transform(() => null)),

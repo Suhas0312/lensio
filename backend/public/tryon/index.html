@@ -65,6 +65,11 @@ header h1{font-size:18px;margin:0;flex:1}
 .picks{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:6px}
 .pick{background:#f4f5fb;border:0;border-radius:12px;padding:6px;display:flex;flex-direction:column;align-items:flex-start;gap:2px;cursor:pointer;color:#0b0f2e;text-align:left}
 .pick img{width:100%;aspect-ratio:2.4;object-fit:contain}.pick span{font-weight:700;font-size:12px}.pick small{font-size:11px;color:#4b5175}
+/* Front light: the screen around the camera picture turns bright white, like a ring light, so faces are lit in the dark. */
+#ringlight{position:fixed;inset:0;pointer-events:none;z-index:40;border:9vmin solid #fff;box-shadow:inset 0 0 60px 30px rgba(255,255,255,.95);opacity:0;transition:opacity .35s}
+body.light-on #ringlight{opacity:1}
+body.light-on{background:#fff}
+.offmsg{padding:28px;text-align:center}
 .pdtool{position:fixed;inset:0;background:rgba(2,3,20,.88);z-index:50;display:flex;align-items:center;justify-content:center;padding:12px}
 .pdtool[hidden]{display:none}
 .pdbox{background:#0c1138;border:1px solid #2a2f6b;border-radius:18px;padding:16px;max-width:720px;width:100%;max-height:96vh;overflow:auto}
@@ -113,6 +118,7 @@ header h1{font-size:18px;margin:0;flex:1}
         <button class="btn" id="selfieBtn">🖼️ Upload photo (gallery / files)</button>
         <button class="btn p" id="measureBtn">✨ AI face scan</button>
         <button class="btn" id="captureBtn" disabled>📸 Capture</button>
+        <button class="btn" id="lightBtn" type="button" title="Front light for dark rooms: lights up your face using the screen" aria-label="Front light: Auto">💡 Light: Auto</button>
         <input type="file" id="selfieIn" accept="image/*,.heic,.heif" hidden>
       </div>
     </div>
@@ -145,6 +151,7 @@ header h1{font-size:18px;margin:0;flex:1}
     </div>
   </div>
 </div>
+<div id="ringlight" aria-hidden="true"></div>
 <div class="pdtool" id="pdTool" role="dialog" aria-label="Precise PD with a card" hidden>
   <div class="pdbox">
     <div class="pdhead"><b>💳 Precise PD with a card</b><button class="linkbtn" id="pdClose" type="button" aria-label="Close">✕</button></div>
@@ -182,6 +189,6 @@ header h1{font-size:18px;margin:0;flex:1}
 <script src="/tryon/three/three.min.js" defer></script>
 <script src="/tryon/three/GLTFLoader.js" defer></script>
 <script src="/tryon/tryon3d.js?v=1" defer></script>
-<script src="/tryon/tryon.js?v=14" defer></script>
+<script src="/tryon/tryon.js?v=15" defer></script>
 </body>
 </html>

@@ -13,44 +13,63 @@ import { colors, gradient, radius, space } from '@/theme';
 const open = (link: string) => { if (!link) return; if (link.startsWith('/')) router.push(link as never); else Linking.openURL(link); };
 const glass = { backgroundColor: 'rgba(21,27,77,0.62)', borderWidth: 1, borderColor: 'rgba(160,170,255,0.16)', borderRadius: radius.md } as const;
 
-interface Banner { id: string; title: string; text: string; cta: string; link: string; imageDesktop: string | null; imageMobile: string | null; alt: string; videoDesktop?: string | null; videoMobile?: string | null }
+interface Banner { id: string; title: string; text: string; cta: string; link: string; imageDesktop: string | null; imageMobile: string | null; alt: string; videoDesktop?: string | null; videoMobile?: string | null; textInImage?: boolean; sound?: boolean }
 
 /** Silent looping banner video: the browser's <video> on the website, a WebView in the app (no extra native module). */
-function BannerVideo({ src, poster }: { src: string; poster?: string | null }) {
+function BannerVideo({ src, poster, muted = true }: { src: string; poster?: string | null; muted?: boolean }) {
   const fill = { position: 'absolute' as const, width: '100%' as const, height: '100%' as const };
+  const webRef = useRef<HTMLVideoElement | null>(null);
+  const nativeRef = useRef<WebView>(null);
+  // Videos always start muted (browsers block sound until a tap); the 🔊 button switches sound on/off.
+  useEffect(() => {
+    if (Platform.OS === 'web') { const v = webRef.current; if (v) { v.muted = muted; if (!muted) v.play().catch(() => {}); } }
+    else nativeRef.current?.injectJavaScript(`(function(){var v=document.querySelector('video');if(v){v.muted=${muted};v.play();}})();true;`);
+  }, [muted]);
   if (Platform.OS === 'web') {
-    return createElement('video', { src, poster: poster ?? undefined, autoPlay: true, muted: true, loop: true, playsInline: true, preload: 'auto',
+    return createElement('video', { ref: webRef, src, poster: poster ?? undefined, autoPlay: true, muted: true, loop: true, playsInline: true, preload: 'auto',
       'aria-hidden': true, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' } });
   }
   const html = `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;height:100%;background:#040722;overflow:hidden}video{width:100%;height:100%;object-fit:cover}</style></head>
-    <body><video src="${src.replace(/"/g, '')}" ${poster ? `poster="${poster.replace(/"/g, '')}"` : ''} autoplay muted loop playsinline></video></body></html>`;
+     <body><video src="${src.replace(/"/g, '')}" ${poster ? `poster="${poster.replace(/"/g, '')}"` : ''} autoplay muted loop playsinline></video></body></html>`;
   return (
     <View pointerEvents="none" style={fill}>
-      <WebView source={{ html }} style={{ flex: 1, backgroundColor: 'transparent' }} originWhitelist={['*']} scrollEnabled={false}
-        mediaPlaybackRequiresUserAction={false} allowsInlineMediaPlayback javaScriptEnabled={false} />
+      <WebView ref={nativeRef} source={{ html }} style={{ flex: 1, backgroundColor: 'transparent' }} originWhitelist={['*']} scrollEnabled={false}
+        mediaPlaybackRequiresUserAction={false} allowsInlineMediaPlayback javaScriptEnabled />
     </View>
   );
 }
 
 /** Rotating home banners from admin → Banners (desktop / mobile images, text, button). Hidden when there are none. */
+/** The app writes headline/text/button on the picture unless the picture already has its own text. */
+const showText = (b: Banner) => !b.textInImage && !!(b.title || b.text || (b.cta && b.link));
+
 export function HomeBanners({ width }: { width: number }) {
-  const [list, setList] = useState<Banner[]>([]);
+  const [all, setList] = useState<Banner[]>([]);
   const [i, setI] = useState(0);
   const ref = useRef<ScrollView>(null);
   const { width: screen } = useWindowDimensions();
   const wide = screen >= 700;
+  // Each device shows only its own banners (no doubles): phones need a mobile picture/video, computers a desktop one.
+  // A banner without any picture (text on the brand colours) shows on both.
+  const list = all.filter((b) => {
+    const desk = !!(b.imageDesktop || b.videoDesktop), mob = !!(b.imageMobile || b.videoMobile);
+    return wide ? desk || (!desk && !mob) : mob || (!desk && !mob);
+  });
   useEffect(() => { cachedApi<Banner[]>('/catalog/banners', setList).then(setList).catch(() => {}); }, []);
+  useEffect(() => { setI(0); ref.current?.scrollTo({ x: 0, animated: false }); }, [wide]);   // phone ↔ desktop: start again
   const goTo = (n: number) => { const k = (n + list.length) % list.length; setI(k); ref.current?.scrollTo({ x: k * width, animated: true }); };
   const [pausedAt, setPausedAt] = useState(0);   // a swipe or arrow tap pauses the automatic change for a while
+  const [soundOn, setSoundOn] = useState(false);  // customer tapped 🔊 on a video banner
   // Auto-advance one by one: images every 5.5 s, video banners stay 9 s so the clip can play.
   useEffect(() => {
-    if (list.length < 2) return;
+    if (list.length < 2 || soundOn) return;      // listening with sound: stay on this banner
     const b = list[i];
     const hasVideo = !!(b && (b.videoDesktop || b.videoMobile));
     const wait = Math.max(hasVideo ? 9000 : 5500, pausedAt + 12000 - Date.now());
     const t = setTimeout(() => goTo(i + 1), wait);
     return () => clearTimeout(t);
-  }, [list, i, width, pausedAt]);
+  }, [list, i, width, pausedAt, soundOn]);
+  useEffect(() => { setSoundOn(false); }, [i]);   // sound never carries over to the next banner
   if (!list.length || width <= 0) return null;
   const h = wide ? Math.round(width / 2.67) : Math.round(width * 0.62);
   const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => { const k = Math.round(e.nativeEvent.contentOffset.x / width); if (k !== i) { setI(k); setPausedAt(Date.now()); } };
@@ -59,20 +78,26 @@ export function HomeBanners({ width }: { width: number }) {
       <ScrollView ref={ref} horizontal pagingEnabled showsHorizontalScrollIndicator={false} onMomentumScrollEnd={onScroll} onScroll={Platform.OS === 'web' ? onScroll : undefined} scrollEventThrottle={64}
         style={{ width, borderRadius: radius.lg }} accessibilityLabel="Offers and collections">
         {list.map((b, k) => {
-          const img = (wide ? b.imageDesktop : b.imageMobile) || b.imageDesktop || b.imageMobile;
-          const vid = (wide ? b.videoDesktop : b.videoMobile) || b.videoDesktop || b.videoMobile;
+          const img = wide ? b.imageDesktop : b.imageMobile;     // never the other device's picture
+          const vid = wide ? b.videoDesktop : b.videoMobile;
           return (
-            <Pressable key={b.id} onPress={() => open(b.link)} accessibilityRole={b.link ? 'link' : undefined} accessibilityLabel={b.alt || b.title}
-              style={{ width, height: h, borderRadius: radius.lg, overflow: 'hidden' }}>
+            <Pressable key={b.id} onPress={() => open(b.link)} accessibilityRole={b.link ? 'link' : undefined} accessibilityLabel={b.alt || b.title || 'Banner'}
+              style={{ width, height: h, borderRadius: radius.lg, overflow: 'hidden' }} accessibilityHint={b.textInImage && b.title ? b.title : undefined}>
               {img ? <Image source={{ uri: img }} style={{ position: 'absolute', width: '100%', height: '100%' }} resizeMode="cover" accessibilityIgnoresInvertColors />
                 : <LinearGradient colors={[...gradient]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ position: 'absolute', width: '100%', height: '100%' }} />}
-              {vid && k === i ? <BannerVideo src={vid} poster={img} /> : null}
-              <LinearGradient colors={['transparent', 'rgba(4,7,34,0.78)']} style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: '70%' }} />
-              <View style={{ position: 'absolute', left: space(5), right: space(5), bottom: space(5), gap: space(1) }}>
-                <Text v="title" color="#fff">{b.title}</Text>
+              {vid && k === i ? <BannerVideo src={vid} poster={img} muted={!(b.sound && soundOn)} /> : null}
+              {showText(b) ? <LinearGradient colors={['transparent', 'rgba(4,7,34,0.78)']} style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: '70%' }} /> : null}
+              {showText(b) ? <View style={{ position: 'absolute', left: space(5), right: space(5), bottom: space(5), gap: space(1) }}>
+                {b.title ? <Text v="title" color="#fff">{b.title}</Text> : null}
                 {b.text ? <Text color="#E5E7FF">{b.text}</Text> : null}
                 {b.cta && b.link ? <View style={{ alignSelf: 'flex-start', backgroundColor: '#fff', borderRadius: radius.pill, paddingHorizontal: space(4), paddingVertical: space(2), marginTop: space(2) }}><Text v="bodyStrong" color={colors.violet}>{b.cta} →</Text></View> : null}
-              </View>
+              </View> : null}
+              {vid && b.sound && k === i ? (
+                <Pressable onPress={() => { setSoundOn((x) => !x); setPausedAt(Date.now()); }} hitSlop={8} accessibilityRole="button" accessibilityLabel={soundOn ? 'Mute video' : 'Play video with sound'}
+                  style={{ position: 'absolute', right: space(3), bottom: space(3), width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(4,7,34,0.6)', alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons name={soundOn ? 'volume-high' : 'volume-mute'} size={20} color="#fff" />
+                </Pressable>
+              ) : null}
             </Pressable>
           );
         })}

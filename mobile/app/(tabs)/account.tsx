@@ -123,7 +123,7 @@ export default function Account() {
       <Card>
         {[
           ...(features.eyeTest ? [{ icon: 'home-outline' as const, t: 'Eye test at home', s: 'Book an optometrist visit', to: '/eye-test' }] : []),
-          { icon: 'location-outline' as const, t: 'Find a store', s: 'Try frames in person', to: '/stores' },
+          ...(features.stores ? [{ icon: 'location-outline' as const, t: 'Find a store', s: 'Try frames in person', to: '/stores' }] : []),
         ].map((x) => (
           <Pressable key={x.t} onPress={() => router.push(x.to)} accessibilityRole="button"><Row>
             <Ionicons name={x.icon} size={22} color={colors.cyan} />

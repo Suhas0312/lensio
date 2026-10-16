@@ -76,7 +76,7 @@ async function buildContext(userId: string | null, question = '', photo = false)
   }).join('\n') : null;
 
   const shopInfo = [settings.shopInfo, settings.instagramUrl ? `Instagram: ${settings.instagramUrl}` : null].filter(Boolean).join('\n') || null;
-  return { products, lenses, coatings, catalog, lensText, coatText, pay, orderText, shopInfo, signedIn: !!userId, eyeTest: settings.eyeTestEnabled };
+  return { products, lenses, coatings, catalog, lensText, coatText, pay, orderText, shopInfo, signedIn: !!userId, eyeTest: settings.eyeTestEnabled, stores: settings.storesEnabled };
 }
 
 function systemPrompt(c: Awaited<ReturnType<typeof buildContext>>) {
@@ -86,7 +86,7 @@ How to answer:
 - Answer EVERY question the customer asks: about Lensio, its frames, lenses, prices, orders and app features, and general eyewear and eye-care knowledge (lens types, coatings, materials, frame sizes, face shapes, how to read a prescription, how to care for glasses). If a question is unrelated to eyewear or Lensio, answer briefly and kindly steer back.
 - Be warm, clear and brief: usually 2-5 short sentences, at most about 120 words. Never paste long lists: give the 2-3 most relevant options and offer more. Use plain language. Reply in the customer's language (English, Hindi, Kannada, Tamil, etc.).
 - One-word questions ("cost", "lens", "size") are real questions: answer the most likely meaning.
-- App features you can explain: Try on tab (live camera try-on, AI face scan for face shape, face width, PD and frame size with voice guidance, exact size from the numbers inside your current glasses e.g. 52□18-140, comparison photos, save to gallery), wishlist (♥), compare up to 3 frames (⇄), stores, Lensio Rewards and gift cards, in-app updates.
+- App features you can explain: Try on tab (live camera try-on, AI face scan for face shape, face width, PD and frame size with voice guidance, exact size from the numbers inside your current glasses e.g. 52□18-140, comparison photos, save to gallery), wishlist (♥), compare up to 3 frames (⇄), ${c.stores ? 'Find a store (Account), ' : ''}Lensio Rewards and gift cards, in-app updates.
 - Only recommend frames from the CATALOG below, using their exact names so the app can show them as cards. Never invent frames, prices, stock, offers or policies. If something isn't listed, say you're not sure and suggest chatting with the team on WhatsApp.
 - Prices are in rupees. Customer pays frame price + lens price + any coatings. Delivery is free above ₹999, otherwise ₹99. First order: code FIRST10 gives 10% off a frame + lens combo (up to ₹750).
 - Prescriptions: you may explain what SPH, CYL, AXIS, ADD and PD mean and which lens type fits (single vision, bifocal, progressive, zero power), and that higher powers need thinner high-index lenses. Never diagnose, never suggest a power, and never give medical advice; for eye problems, pain, sudden vision changes or a new prescription, tell them to see an optometrist or eye doctor. Our optician checks every prescription before lenses are made.
@@ -342,7 +342,7 @@ function basicAnswer(q: string, c: Ctx): string {
   if (has(/\b(pain|headache|red eye|itch|blur(red|ry)?|watering|infection)\b/)) return "I can't give medical advice. For eye pain, redness, headaches or blurred vision, please see an optometrist or eye doctor.";
   if (has(/\b(clean|care|scratch proof|maintain)\b/)) return 'Clean lenses with lukewarm water and a drop of mild soap, then dry with a microfibre cloth. Avoid tissues and shirts (they scratch). Store glasses in the case, lenses facing up.';
   // shop info
-  if (has(/\b(store|shop|address|location|near me|visit|timing|open|hours)\b/)) return c.shopInfo ? `${c.shopInfo.split('\n').slice(0, 2).join(' ')} You can also see our stores in Account → Find a store.` : 'See our stores in Account → Find a store, or chat with us on WhatsApp for directions. [HANDOFF]';
+  if (has(/\b(store|shop|address|location|near me|visit|timing|open|hours)\b/)) return c.shopInfo ? `${c.shopInfo.split('\n').slice(0, 2).join(' ')} ${c.stores ? ' You can also see our stores in Account → Find a store.' : ''}` : c.stores ? 'See our stores in Account → Find a store, or chat with us on WhatsApp for directions. [HANDOFF]' : 'We shop online right now: frames are delivered to your door. For anything else, chat with us on WhatsApp. [HANDOFF]';
   if (has(/\b(contact|call|phone|whatsapp|support|help|talk|human|agent)\b/)) return 'Chat with our team on WhatsApp: tap the WhatsApp button below. [HANDOFF]';
   // offers
   if (has(/\b(offers?|discounts?|coupons?|codes?|sales?|deals?|first10)\b/)) return 'New customers: code FIRST10 gives 10% off a frame + lens combo (up to ₹750). You also earn Lensio Rewards points on every order, and frames show their current discount in Shop.';

@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { getSettings } from '../settings/settings.service';
 import { prisma } from '../../lib/prisma';
 import { ah } from '../../lib/asyncHandler';
 
@@ -14,6 +15,7 @@ function haversineKm(a: { lat: number; lng: number }, b: { lat: number; lng: num
 
 /** Public list of store locations, optionally sorted by distance from the customer. */
 r.get('/', ah(async (req, res) => {
+  if (!(await getSettings()).storesEnabled) return res.json([]);   // "Find a store" switched off in admin
   const stores = await prisma.store.findMany({ where: { isActive: true }, orderBy: { sortOrder: 'asc' } });
   const lat = Number(req.query.lat), lng = Number(req.query.lng);
   if (Number.isFinite(lat) && Number.isFinite(lng)) {

@@ -14,3 +14,26 @@ describe('home banners', () => {
     expect(() => b({ link: 'http://insecure.example' })).toThrow();
   });
 });
+
+describe('banner rules (3.6.1)', () => {
+  it('headline is optional, and the new switches are kept', async () => {
+    const { bannerSchema } = await import('./banners');
+    const b = bannerSchema.parse({ id: 'b1', imageDesktop: 'https://x.com/d.jpg', textInImage: true, sound: true, visible: true });
+    expect(b).toMatchObject({ title: '', textInImage: true, sound: true });
+  });
+  it('“Until” must be after “From”', async () => {
+    const { bannerSchema } = await import('./banners');
+    const bad = bannerSchema.safeParse({ id: 'b1', startsAt: '2026-10-16T07:00:00.000Z', endsAt: '2026-10-16T07:00:00.000Z' });
+    expect(bad.success).toBe(false);
+    expect(bannerSchema.safeParse({ id: 'b1', startsAt: '2026-10-16T07:00:00.000Z', endsAt: '2026-10-20T07:00:00.000Z' }).success).toBe(true);
+  });
+});
+
+describe('reading saved banners', () => {
+  it('a banner saved with odd dates (or an old format) never hides the others', async () => {
+    const { bannerFields } = await import('./banners');
+    const saved = [{ id: 'a', title: '.', startsAt: '2026-10-16T07:00:00.000Z', endsAt: '2026-10-16T07:00:00.000Z', visible: true }, { id: 'b', title: 'Sunglasses', visible: true }, { broken: true }];
+    const read = saved.map((b) => bannerFields.safeParse(b)).filter((r) => r.success);
+    expect(read.length).toBe(2);
+  });
+});

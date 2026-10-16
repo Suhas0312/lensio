@@ -10,6 +10,11 @@ const ICON: Record<OwnerAlert, string> = {
   new_order: '🛍️', payment_to_check: '💰', prescription_to_review: '👓', cancelled: '✖️', courier_problem: '⚠️', eye_test: '🏠', review: '⭐',
 };
 
+/** Where alerts go: ADMIN_EMAILS (Render) plus the addresses typed in admin → Settings, without duplicates. */
+export function alertRecipients(fromSettings: string) {
+  return [...new Set([...env.ADMIN_EMAILS.split(','), ...fromSettings.split(',')].map((e) => e.trim().toLowerCase()).filter((e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)))];
+}
+
 /**
  * Emails the shop owner(s) (everyone in ADMIN_EMAILS) about something that needs attention.
  * Never throws: an alert failing must not break an order.
@@ -18,7 +23,7 @@ export async function alertOwner(kind: OwnerAlert, title: string, lines: string[
   try {
     const s = await getSettings();
     if (!s.ownerEmailAlerts) return;
-    const to = env.ADMIN_EMAILS.split(',').map((e) => e.trim()).filter(Boolean);
+    const to = alertRecipients(s.alertEmails);
     if (!to.length && !env.OWNER_WHATSAPP_NUMBERS) return;
     const link = `${env.PUBLIC_BASE_URL.replace(/\/$/, '')}/admin/${orderId ? `#order=${orderId}` : ''}`;
     const subject = `${ICON[kind]} ${title}`;

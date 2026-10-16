@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Linking, Platform, View } from 'react-native';
 import { api } from '@/api/client';
+import { useFeatures } from '@/lib/features';
+import { router } from 'expo-router';
 import { Button, Card, Empty, Loading, Row, Screen, Text } from '@/components/UI';
 import { colors, space } from '@/theme';
 
@@ -22,7 +24,7 @@ async function locate(): Promise<{ lat: number; lng: number } | null> {
   } catch { return null; }
 }
 
-export default function Stores() {
+function StoresList() {
   const [stores, setStores] = useState<Store[] | null>(null);
   const [near, setNear] = useState(false);
   const load = (q = '') => api<Store[]>(`/stores${q}`).then(setStores).catch(() => setStores([]));
@@ -62,4 +64,12 @@ export default function Stores() {
       )) : <Empty title="Stores coming soon" body="We're online for now. Chat with us on WhatsApp for help." />}
     </Screen>
   );
+}
+
+/** Shown only while "Find a store" is switched on in admin → Settings. */
+export default function Stores() {
+  const features = useFeatures();
+  if (!features.loaded) return <Loading />;
+  if (!features.stores) return <Empty title="We're online only right now" body="Frames are delivered to your door. Questions? Ask Lensio or chat with us on WhatsApp." action={<Button title="Browse frames" onPress={() => router.replace('/(tabs)/shop')} />} />;
+  return <StoresList />;
 }

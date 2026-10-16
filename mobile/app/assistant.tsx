@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
+import { useFeatures } from '@/lib/features';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,7 +11,7 @@ import { api, ApiError } from '@/api/client';
 import { Msg, ProductCard, useAssistant } from '@/store/assistant';
 import { VoiceButton } from '@/components/VoiceButton';
 import { Logo } from '@/components/Logo';
-import { Text } from '@/components/UI';
+import { Button, Empty, Loading, Text } from '@/components/UI';
 import { colors, gradient, radius, space, type } from '@/theme';
 import { inr } from '@/lib/format';
 import { webColumn } from '@/lib/layout';
@@ -37,7 +38,7 @@ const SUGGESTIONS = [
 ];
 const id = () => Math.random().toString(36).slice(2);
 
-export default function Assistant() {
+function AssistantChat() {
   const { ask } = useLocalSearchParams<{ ask?: string }>();
   const { messages, add, reset } = useAssistant();
   const [text, setText] = useState('');
@@ -174,4 +175,12 @@ function Bubble({ m, onWhatsApp }: { m: Msg; onWhatsApp: () => void }) {
       ) : null}
     </View>
   );
+}
+
+/** Shown only while Ask Lensio is switched on in admin → Settings. */
+export default function Assistant() {
+  const features = useFeatures();
+  if (!features.loaded) return <Loading />;
+  if (!features.assistant) return <Empty title="Ask Lensio is resting" body="Our team is happy to help on WhatsApp in the meantime." action={<Button title="Browse frames" onPress={() => router.replace('/(tabs)/shop')} />} />;
+  return <AssistantChat />;
 }

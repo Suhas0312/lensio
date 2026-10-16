@@ -650,9 +650,17 @@
         <p class="muted small">Customers on an older app than <b>Latest version</b> get an update window when they open the app; they can choose “Later”. Apps older than <b>Minimum version</b> can't skip it: use this only when an old app would stop working. Updating installs over the existing app, so customers stay signed in and keep their orders.</p></div>
       <div class="card"><h2>Automation</h2>
         <p class="muted small">Orders move on by themselves where no hands-on work is needed. Customers are messaged at each step.</p>
-        <label class="check"><input type="checkbox" id="setAlerts" ${s.ownerEmailAlerts ? 'checked' : ''}> <span><b>Email me</b> about new orders, UPI payments to check, prescriptions to review, cancellations and courier problems (sent to every address in ADMIN_EMAILS)</span></label>
+        <label class="check"><input type="checkbox" id="setAlerts" ${s.ownerEmailAlerts ? 'checked' : ''}> <span><b>Email me about every new order</b>, UPI payments to check, prescriptions to review, cancellations and courier problems</span></label>
+        <label style="margin-left:28px">Send these emails to <span class="small muted">(several addresses: separate with commas; ADMIN_EMAILS from Render are always included)</span>
+          <input id="setAlertEmails" value="${esc(s.alertEmails || '')}" placeholder="owner@gmail.com, manager@gmail.com"></label>
         <label class="check"><input type="checkbox" id="setAutoLens" ${s.autoStartLensWork ? 'checked' : ''}> <span>When a prescription is verified, <b>start lens cutting & fitting</b> automatically</span></label>
         <label class="check"><input type="checkbox" id="setFrameQc" ${s.frameOnlyToQc ? 'checked' : ''}> <span><b>Frame-only orders</b> skip the lens steps and go straight to quality check</span></label>
+        <h3 style="margin:14px 0 4px">Customer features</h3>
+        <label class="check"><input type="checkbox" id="setTry2d" ${s.tryOn2d !== false ? 'checked' : ''}> <span><b>2D try-on</b>: frames drawn flat on the live camera or a photo (works on every phone)</span></label>
+        <label class="check"><input type="checkbox" id="setTry3d" ${s.tryOn3d !== false ? 'checked' : ''}> <span><b>3D try-on</b>: frames in 3D that turn with the head (needs a newer phone or computer; falls back to 2D)</span></label>
+        <p class="small muted" style="margin:0 0 6px 28px">With both off, the Try on tab and “Try it on” buttons explain that try-on is paused. The AI face scan and card PD stay available inside try-on only while one of them is on.</p>
+        <label class="check"><input type="checkbox" id="setAssistant" ${s.assistantEnabled !== false ? 'checked' : ''}> <span><b>Ask Lensio</b> (chat assistant): the chat button and assistant page</span></label>
+        <label class="check"><input type="checkbox" id="setStores" ${s.storesEnabled !== false ? 'checked' : ''}> <span><b>Find a store</b>: show your stores to customers (Account, Home, website menu, Ask Lensio). Switch off if you sell online only.</span></label>
         <label class="check"><input type="checkbox" id="setEyeTest" ${s.eyeTestEnabled ? 'checked' : ''}> <span><b>Eye test at home</b>: show the booking option to customers (Home, Account, Ask Lensio). Leave off until you have an optometrist ready; bookings are refused while it's off.</span></label>
         <p class="small" style="margin:6px 0"><b>Prescription approval:</b> only orders with <b>power lenses</b> wait for your approval (Prescriptions tab). <b>Zero-power</b> glasses are approved automatically and go straight to lens fitting; <b>frames only</b> and <b>sunglasses without power</b> skip lenses entirely.</p>
         <label class="check"><input type="checkbox" id="setAutoRx" ${s.autoApproveTypedRx ? 'checked' : ''}> <span><b>Auto-approve typed prescriptions</b> that pass every check and aren't high power. Uploaded photos and high powers are always reviewed by a person. Leave this off if your optician should check every prescription.</span></label>
@@ -739,11 +747,12 @@
         <div style="width:260px;max-width:100%;aspect-ratio:2.4;border-radius:14px;overflow:hidden;background:linear-gradient(120deg,#08B9DB,#7B61FF,#C94EF2);position:relative;flex:none">
           ${b.videoDesktop ? `<video src="${esc(b.videoDesktop)}" ${b.imageDesktop ? `poster="${esc(b.imageDesktop)}"` : ''} autoplay muted loop playsinline style="width:100%;height:100%;object-fit:cover"></video>`
             : b.imageDesktop ? `<img src="${esc(b.imageDesktop)}" alt="" style="width:100%;height:100%;object-fit:cover">` : ''}
-          <div style="position:absolute;left:12px;bottom:10px;right:12px;color:#fff;text-shadow:0 1px 6px rgba(0,0,0,.5)"><b>${esc(b.title || 'Headline')}</b><div class="small">${esc(b.text || '')}</div></div>
+          ${b.textInImage ? '' : `<div style="position:absolute;left:12px;bottom:10px;right:12px;color:#fff;text-shadow:0 1px 6px rgba(0,0,0,.5)"><b>${esc(b.title || '')}</b><div class="small">${esc(b.text || '')}</div></div>`}
         </div>
         <div style="flex:1;min-width:240px;display:grid;gap:8px">
-          <label>Headline<input data-bf="${i}:title" value="${esc(b.title)}" maxlength="80"></label>
-          <label>Text<input data-bf="${i}:text" value="${esc(b.text || '')}" maxlength="200"></label>
+          <label class="check"><input type="checkbox" data-bf="${i}:textInImage" ${b.textInImage ? 'checked' : ''}> <span><b>This picture already has its own text</b>: don't write the headline and button on it (the whole banner still opens the link)</span></label>
+          <label>Headline <span class="small muted">(optional${b.textInImage ? ': only read out by screen readers' : ''})</span><input data-bf="${i}:title" value="${esc(b.title || '')}" maxlength="80"></label>
+          <label>Text <span class="small muted">(optional)</span><input data-bf="${i}:text" value="${esc(b.text || '')}" maxlength="200"></label>
           <div style="display:flex;gap:8px;flex-wrap:wrap"><label style="flex:1">Button<input data-bf="${i}:cta" value="${esc(b.cta || '')}" placeholder="e.g. Shop now" maxlength="30"></label>
           <label style="flex:2">Opens<input data-bf="${i}:link" value="${esc(b.link || '')}" placeholder="/shop?kind=sunglasses · /tryon · /product/vista-rectangle"></label></div>
         </div>
@@ -759,17 +768,28 @@
         ${b.videoDesktop ? `<button class="link" data-act="banVidDel" data-i="${i}" data-k="videoDesktop" title="Remove desktop video">✕</button>` : ''}
         <button class="btn" data-act="banVid" data-i="${i}" data-k="videoMobile">🎬 ${b.videoMobile ? 'Change' : 'Add'} mobile video</button>
         ${b.videoMobile ? `<video src="${esc(b.videoMobile)}" muted autoplay loop playsinline style="height:40px;border-radius:6px"></video><button class="link" data-act="banVidDel" data-i="${i}" data-k="videoMobile" title="Remove mobile video">✕</button>` : ''}
-        <span class="small muted">Optional: a short silent MP4 (5–15 s, under 25 MB) plays on a loop instead of the image. Keep the images too: they show while the video loads.</span>
+        ${b.videoDesktop || b.videoMobile ? `<label class="check"><input type="checkbox" data-bf="${i}:sound" ${b.sound ? 'checked' : ''}> <span><b>Sound</b>: show a 🔊 button customers can tap (videos always start muted: browsers only allow sound after a tap)</span></label>` : ''}
+        <span class="small muted">Optional: a short MP4 (5–15 s, under 25 MB) plays on a loop instead of the image. Keep the images too: they show while the video loads.</span>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center" class="small">
         <label class="check"><input type="checkbox" data-bf="${i}:visible" ${b.visible ? 'checked' : ''}> <span>Visible</span></label>
-        <label>From <input type="datetime-local" data-bf="${i}:startsAt" value="${dt(b.startsAt)}"></label>
-        <label>Until <input type="datetime-local" data-bf="${i}:endsAt" value="${dt(b.endsAt)}"></label>
+        <label>Show from <span class="muted">(optional)</span> <input type="datetime-local" data-bf="${i}:startsAt" value="${dt(b.startsAt)}"></label>${b.startsAt ? `<button class="link" data-act="banClear" data-i="${i}" data-k="startsAt" title="Clear">✕</button>` : ''}
+        <label>Until <span class="muted">(optional)</span> <input type="datetime-local" data-bf="${i}:endsAt" value="${dt(b.endsAt)}"></label>${b.endsAt ? `<button class="link" data-act="banClear" data-i="${i}" data-k="endsAt" title="Clear">✕</button>` : ''}
         <span class="grow"></span>
         <button class="link" data-act="banMove" data-i="${i}" data-d="-1" ${i === 0 ? 'disabled' : ''}>↑ Up</button>
         <button class="link" data-act="banMove" data-i="${i}" data-d="1" ${i === list.length - 1 ? 'disabled' : ''}>↓ Down</button>
         <button class="link" style="color:#f87171" data-act="banDel" data-i="${i}">🗑 Remove</button>
-      </div></div>`;
+      </div>
+      ${(() => {
+        const warn = [];
+        if (!b.imageDesktop && !b.videoDesktop && (b.imageMobile || b.videoMobile)) warn.push('Phones only: no desktop picture, so computers don’t show this banner. To show it on both, add the desktop image to <b>this same banner</b>.');
+        if (!b.imageMobile && !b.videoMobile && (b.imageDesktop || b.videoDesktop)) warn.push('Computers only: no mobile picture, so phones (app and mobile website) don’t show this banner. To show it on both, add the mobile image to <b>this same banner</b>.');
+        if (!b.imageDesktop && !b.imageMobile && !b.videoDesktop && !b.videoMobile) warn.push('No picture yet: the banner shows your brand gradient.');
+        if (b.startsAt && b.endsAt && new Date(b.endsAt) <= new Date(b.startsAt)) warn.push('“Until” is not later than “Show from”: this banner would never show. Clear both to always show it.');
+        if (b.endsAt && new Date(b.endsAt) < new Date()) warn.push('“Until” is in the past: this banner has ended and is not shown.');
+        if (b.visible && !b.textInImage && !b.title && !b.text && b.cta) warn.push('Only a button and no headline: add a headline, or tick “already has its own text”.');
+        return warn.length ? `<div class="small" style="border:1px solid #f59e0b;border-radius:10px;padding:8px 10px;color:#fbbf24">${warn.map((w) => '⚠ ' + w).join('<br>')}</div>` : '';
+      })()}</div>`;
     return shell(`<div class="bar"><h1 class="grow">Home banners</h1><button class="btn" data-act="banAdd">+ Add banner</button><button class="btn p" data-act="banSave">Save banners</button></div>
       <p class="small muted">Banners rotate at the top of Home in the app and website. Best sizes: desktop 1600 × 600, mobile 900 × 560 (images: JPG/PNG/WebP under 5 MB; videos: MP4 under 25 MB, same shapes). Banners slide automatically; video banners stay until the clip has played. Without an image, the banner shows your brand gradient with the headline. Only real offers, please: customers can see them.</p>
       ${list.length ? list.map(card).join('') : '<div class="card"><p>No banners yet. Tap <b>+ Add banner</b>. Until you add some, Home shows its usual sections.</p></div>'}
@@ -1025,6 +1045,7 @@
       if (act === 'banDel') { if (!confirm('Remove this banner?')) return; S.data.banners.splice(+el.dataset.i, 1); return render(); }
       if (act === 'banMove') { const i = +el.dataset.i, j = i + +el.dataset.d, l = S.data.banners; [l[i], l[j]] = [l[j], l[i]]; return render(); }
       if (act === 'banVid') { S.banTarget = { i: +el.dataset.i, k: el.dataset.k }; return $('#banVidFile').click(); }
+      if (act === 'banClear') { S.data.banners[+el.dataset.i][el.dataset.k] = null; return render(); }
       if (act === 'banVidDel') { S.data.banners[+el.dataset.i][el.dataset.k] = null; toast('Video removed: tap Save banners'); return render(); }
       if (act === 'banImg') { S.banTarget = { i: +el.dataset.i, k: el.dataset.k }; return $('#banFile').click(); }
       if (act === 'banSave') {
@@ -1099,7 +1120,8 @@
             androidApkUrl: $('#setApk').value.trim() || null, androidLatestVersion: $('#setVer').value.trim() || null, androidMinVersion: $('#setMinVer').value.trim() || null, androidReleaseRepo: $('#setRepo').value.trim().replace(/^https?:\/\/github\.com\//i, '').replace(/\/+$/, '') || null, androidUpdateNotes: $('#setNotes').value.trim() || null, shopInfo: $('#setInfo').value.trim() || null,
             instagramUrl: ($('#setInsta').value.trim().split('?')[0]) || null,
             ownerEmailAlerts: $('#setAlerts').checked, autoStartLensWork: $('#setAutoLens').checked,
-            frameOnlyToQc: $('#setFrameQc').checked, autoApproveTypedRx: $('#setAutoRx').checked, eyeTestEnabled: $('#setEyeTest').checked,
+            frameOnlyToQc: $('#setFrameQc').checked, autoApproveTypedRx: $('#setAutoRx').checked, eyeTestEnabled: $('#setEyeTest').checked, storesEnabled: $('#setStores').checked,
+            tryOn2d: $('#setTry2d').checked, tryOn3d: $('#setTry3d').checked, assistantEnabled: $('#setAssistant').checked, alertEmails: $('#setAlertEmails').value.trim(),
             loyaltyEnabled: $('#setLoyal').checked, loyaltyPointsPer100: Math.max(0, parseInt($('#setPts').value, 10) || 0),
             loyaltyMaxRedeemPercent: Math.min(100, Math.max(0, parseInt($('#setPtsMax').value, 10) || 0)), reviewsAutoApprove: $('#setRevAuto').checked } });
           S.data.release = await api('/admin/app-release').catch(() => null); toast('Settings saved'); return render();
@@ -1244,7 +1266,7 @@
       if (t.dataset.bf) {
         const [i, k] = t.dataset.bf.split(':'), b = S.data.banners[+i];
         b[k] = t.type === 'checkbox' ? t.checked : t.type === 'datetime-local' ? (t.value ? new Date(t.value).toISOString() : null) : t.value;
-        if (k === 'visible') render();
+        if (['visible', 'textInImage', 'sound', 'startsAt', 'endsAt'].includes(k)) render();
         return;
       }
       if (t.id === 'banVidFile') {

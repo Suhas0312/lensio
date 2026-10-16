@@ -6,9 +6,10 @@ import { prisma } from '../../lib/prisma';
  * migration is needed. Each banner can have separate desktop and mobile images, text, a button, a link,
  * visibility and optional start/end dates.
  */
-export const bannerSchema = z.object({
+/** Fields of a banner (used to read saved banners: tolerant, never drops the whole list). */
+export const bannerFields = z.object({
   id: z.string().min(1).max(40),
-  title: z.string().trim().min(1, 'Add a headline').max(80),
+  title: z.string().trim().max(80).optional().default(''),   // optional: designs often carry their own text
   text: z.string().trim().max(200).optional().default(''),
   cta: z.string().trim().max(30).optional().default(''),
   link: z.string().trim().max(300).refine((l) => !l || l.startsWith('/') || /^https:\/\//.test(l), 'Link must start with / (inside the app) or https://').optional().default(''),
@@ -19,17 +20,25 @@ export const bannerSchema = z.object({
   // wherever video can't play, so a banner with a video should still have images.
   videoDesktop: z.string().url().refine((u) => /^https:\/\//.test(u), 'Use an https link').nullable().optional().default(null),
   videoMobile: z.string().url().refine((u) => /^https:\/\//.test(u), 'Use an https link').nullable().optional().default(null),
+  textInImage: z.boolean().optional().default(false),   // the picture already has its own text: don't write headline/button on it
+  sound: z.boolean().optional().default(false),         // video banner: show a 🔊 button customers can tap (always starts muted)
   visible: z.boolean().default(true),
   startsAt: z.string().datetime().nullable().optional().default(null),
   endsAt: z.string().datetime().nullable().optional().default(null),
 });
-export type Banner = z.infer<typeof bannerSchema>;
+/** Rules when saving from admin: also checks the dates make sense. */
+export const bannerSchema = bannerFields.refine((b) => !b.startsAt || !b.endsAt || new Date(b.endsAt) > new Date(b.startsAt), { message: '“Until” must be later than “Show from” (or leave both empty to always show)', path: ['endsAt'] });
+export type Banner = z.infer<typeof bannerFields>;
 const KEY = 'homeBanners';
 
 export async function getBanners(): Promise<Banner[]> {
   const row = await prisma.setting.findUnique({ where: { key: KEY } });
   if (!row?.value) return [];
-  try { return z.array(bannerSchema).parse(JSON.parse(row.value)); } catch { return []; }
+  // Read banner by banner: one bad entry must never hide all the others.
+  try {
+    const raw = JSON.parse(row.value);
+    return Array.isArray(raw) ? raw.map((b) => bannerFields.safeParse(b)).filter((r) => r.success).map((r) => (r as { data: Banner }).data) : [];
+  } catch { return []; }
 }
 export async function saveBanners(list: Banner[]) {
   const value = JSON.stringify(list);

@@ -3,6 +3,7 @@ import { Image, ScrollView, View, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams, Stack } from 'expo-router';
 import { useLayout } from '@/lib/layout';
+import { useFeatures } from '@/lib/features';
 import { api, cachedApi } from '@/api/client';
 import { useCompare, useWishlist } from '@/store/shopping';
 import { useRecent } from '@/lib/recent';
@@ -31,6 +32,7 @@ export default function ProductScreen() {
   const [size, setSize] = useState<FrameSize>();
   const start = useLensFlow((s) => s.start);
   const user = useAuth((s) => s.user);
+  const features = useFeatures();
   const liked = useWishlist((s) => (p ? s.ids.has(p.id) : false)), toggleLike = useWishlist((s) => s.toggle);
   const comparing = useCompare((s) => (p ? s.items.some((x) => x.id === p.id) : false)), toggleCompare = useCompare((s) => s.toggle);
 
@@ -141,7 +143,7 @@ export default function ProductScreen() {
       </Card>
 
       <Button kind="secondary" title="👓 Try this frame on" onPress={tryOn} />
-      <Button kind="ghost" title="💬 Ask about this frame" onPress={() => router.push({ pathname: '/assistant', params: { ask: `Tell me about the ${p.name}: who it suits, and which lenses you'd pair with it.` } })} />
+      {features.assistant ? <Button kind="ghost" title="💬 Ask about this frame" onPress={() => router.push({ pathname: '/assistant', params: { ask: `Tell me about the ${p.name}: who it suits, and which lenses you'd pair with it.` } })} /> : null}
 
       <View style={{ gap: space(2) }}>
         <Text v="title">Details</Text>

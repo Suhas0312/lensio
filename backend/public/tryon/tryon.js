@@ -361,6 +361,65 @@
   $('#v2d').addEventListener('click', () => setView3d(false));
   $('#v3d').addEventListener('click', () => setView3d(true));
 
+  // ---------- Shop switches (admin → Settings): 2D and/or 3D try-on ----------
+  fetch('/v1/config').then((r) => r.json()).then((c) => {
+    const f = (c && c.features) || {};
+    const has2d = f.tryOn2d !== false, has3d = f.tryOn3d !== false;
+    if (!has2d && !has3d) {          // both switched off: explain instead of showing a camera
+      document.querySelector('main, .wrap, body').insertAdjacentHTML('afterbegin', '<div class="card offmsg"><h2>Try-on is paused</h2><p class="muted">The shop has switched virtual try-on off for now. You can still browse and buy frames.</p></div>');
+      ['#camBtn', '#fileBtn', '#measureBtn', '#captureBtn', '#lightBtn', '#cardPdBtn'].forEach((q) => { const el = $(q); if (el) el.disabled = true; });
+      const seg = document.querySelector('.seg'); if (seg) seg.hidden = true;
+      return;
+    }
+    const seg = document.querySelector('.seg');
+    if (!has3d) { if (seg) seg.hidden = true; if (S.view3d) setView3d(false); }
+    if (!has2d) { if (seg) seg.hidden = true; setView3d(true); }   // 3D only (falls back to 2D on phones without 3D)
+  }).catch(() => {});
+
+  // ---------- Front light for dark rooms ----------
+  // The phone's front camera has no flash, so the screen becomes the light: a bright white frame around the picture.
+  // Auto: measures the camera picture's brightness every second (on when dark, off when bright, a little earlier at night).
+  const LIGHT_KEY = 'lensio.tryon.light';
+  const light = { mode: (() => { try { return localStorage.getItem(LIGHT_KEY) || 'auto'; } catch { return 'auto'; } })(), on: false, timer: null, said: false };
+  const lumCanvas = document.createElement('canvas'); lumCanvas.width = 32; lumCanvas.height = 24;
+  function setLight(on) {
+    if (on === light.on) return;
+    light.on = on; document.body.classList.toggle('light-on', on);
+    // a real torch, if this camera has one (some phones/laptops), helps too
+    try { const t = S.stream && S.stream.getVideoTracks()[0]; if (t && t.getCapabilities && t.getCapabilities().torch) t.applyConstraints({ advanced: [{ torch: on }] }).catch(() => {}); } catch { /* not supported */ }
+    if (on && light.mode === 'auto' && !light.said) { light.said = true; toast('It\'s dark: the screen light is on. Turn your screen brightness up for the best scan.'); speak('It is dark, so I turned on the screen light. Turn your screen brightness up.'); }
+  }
+  function brightness() {
+    if (S.mode !== 'live' || !video.videoWidth) return null;
+    const g = lumCanvas.getContext('2d', { willReadFrequently: true }); g.drawImage(video, 0, 0, 32, 24);
+    const d = g.getImageData(0, 0, 32, 24).data; let sum = 0;
+    for (let i = 0; i < d.length; i += 4) sum += 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
+    return sum / (d.length / 4);   // 0 (black) … 255 (white)
+  }
+  function autoLight() {
+    const b = brightness(); if (b == null) return;
+    const h = new Date().getHours(), night = h >= 19 || h < 6;
+    // when the light is on it brightens the picture itself, so it needs a clearly brighter picture to switch off again
+    const onBelow = night ? 85 : 65, offAbove = light.on ? 175 : onBelow + 20;
+    if (!light.on && b < onBelow) setLight(true); else if (light.on && b > offAbove) setLight(false);
+  }
+  function applyLight() {
+    clearInterval(light.timer); light.timer = null;
+    const label = { auto: 'Auto', on: 'On', off: 'Off' }[light.mode];
+    $('#lightBtn').textContent = `💡 Light: ${label}`; $('#lightBtn').setAttribute('aria-label', `Front light: ${label}`);
+    $('#lightBtn').classList.toggle('p', light.mode === 'on');
+    if (light.mode === 'on') setLight(S.mode === 'live');
+    else if (light.mode === 'off') setLight(false);
+    else { setLight(false); light.timer = setInterval(autoLight, 1000); }
+  }
+  $('#lightBtn').addEventListener('click', () => {
+    light.mode = { auto: 'on', on: 'off', off: 'auto' }[light.mode];
+    try { localStorage.setItem(LIGHT_KEY, light.mode); } catch { /* private mode */ }
+    applyLight();
+  });
+  window.__lensioLight = light; window.__lensioLightBrightness = brightness;   // for diagnostics
+  applyLight();
+
   // Live tracking loop
   let loopT = null;
   function startLoop() {
@@ -391,6 +450,7 @@
     video.srcObject = S.stream; video.hidden = false; photo.hidden = true; $('#placeholder').hidden = true;
     S.mode = 'live'; S.face = null; S.manual = null; S.misses = 0; S.following = null; resetShape();
     $('#camBtn').textContent = '⏹ Stop camera';
+    if (light.mode === 'on') setLight(true);
     status('Loading face detection…');
     await video.play().catch(() => {});
     models().then(startLoop).catch(() => status('Drag the frame into place'));
@@ -398,6 +458,7 @@
   }
   function stopCam() {
     clearInterval(loopT);
+    setLight(false);
     if (S.stream) { S.stream.getTracks().forEach((t) => t.stop()); S.stream = null; }
     video.hidden = true; $('#camBtn').textContent = '📷 Live camera';
     if (S.mode === 'live') { S.mode = 'none'; $('#placeholder').hidden = false; overlay.style.display = 'none'; status('Turn on the camera or upload a selfie'); }

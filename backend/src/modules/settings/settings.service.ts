@@ -17,7 +17,12 @@ export interface ShopSettings {
   // Automation
   ownerEmailAlerts: boolean;           // email ADMIN_EMAILS about new orders, payments to check, prescriptions, problems
   autoStartLensWork: boolean;          // prescription verified → lens cutting & fitting straight away
-  eyeTestEnabled: boolean;             // "Eye test at home" bookings shown to customers (off until the shop is ready)
+  eyeTestEnabled: boolean;
+  storesEnabled: boolean;              // "Find a store" shown to customers
+  tryOn2d: boolean;                    // live 2D try-on (glasses drawn on the camera picture)
+  tryOn3d: boolean;                    // 3D try-on view
+  assistantEnabled: boolean;           // "Ask Lensio" chat
+  alertEmails: string;                 // extra addresses for new-order / payment alerts (comma separated), besides ADMIN_EMAILS             // "Eye test at home" bookings shown to customers (off until the shop is ready)
   autoApproveTypedRx: boolean;         // typed prescriptions that pass all checks (and aren't high power) are approved automatically
   frameOnlyToQc: boolean;              // frame-only orders skip the lens steps and go straight to quality check
   // Loyalty
@@ -29,7 +34,7 @@ export interface ShopSettings {
 }
 
 const DEFAULTS: ShopSettings = { upiId: null, upiPayeeName: 'Lensio', upiQrImage: null, codEnabled: false, androidApkUrl: null, androidLatestVersion: null, androidMinVersion: null, androidUpdateNotes: null, androidReleaseRepo: null, shopInfo: null, instagramUrl: null,
-  ownerEmailAlerts: true, autoStartLensWork: true, autoApproveTypedRx: false, frameOnlyToQc: true, eyeTestEnabled: false,
+  ownerEmailAlerts: true, autoStartLensWork: true, autoApproveTypedRx: false, frameOnlyToQc: true, eyeTestEnabled: false, storesEnabled: true, tryOn2d: true, tryOn3d: true, assistantEnabled: true, alertEmails: '',
   loyaltyEnabled: true, loyaltyPointsPer100: 5, loyaltyMaxRedeemPercent: 20, reviewsAutoApprove: true };
 
 let cache: { at: number; v: ShopSettings } | null = null;
@@ -55,6 +60,11 @@ export async function getSettings(): Promise<ShopSettings> {
     autoStartLensWork: bool(m.autoStartLensWork, DEFAULTS.autoStartLensWork),
     autoApproveTypedRx: bool(m.autoApproveTypedRx, DEFAULTS.autoApproveTypedRx),
     eyeTestEnabled: bool(m.eyeTestEnabled, DEFAULTS.eyeTestEnabled),
+    storesEnabled: bool(m.storesEnabled, DEFAULTS.storesEnabled),
+    tryOn2d: bool(m.tryOn2d, DEFAULTS.tryOn2d),
+    tryOn3d: bool(m.tryOn3d, DEFAULTS.tryOn3d),
+    assistantEnabled: bool(m.assistantEnabled, DEFAULTS.assistantEnabled),
+    alertEmails: m.alertEmails ?? DEFAULTS.alertEmails,
     frameOnlyToQc: bool(m.frameOnlyToQc, DEFAULTS.frameOnlyToQc),
     loyaltyEnabled: bool(m.loyaltyEnabled, DEFAULTS.loyaltyEnabled),
     loyaltyPointsPer100: m.loyaltyPointsPer100 ? Number(m.loyaltyPointsPer100) : DEFAULTS.loyaltyPointsPer100,

@@ -1,4 +1,5 @@
 import { Pressable } from 'react-native';
+import { useFeatures } from '@/lib/features';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -7,6 +8,8 @@ import { Text } from './UI';
 
 /** Floating "Ask Lensio" button that opens the AI assistant. */
 export function ChatFab() {
+  const { assistant } = useFeatures();
+  if (!assistant) return null;     // Ask Lensio switched off in admin → Settings
   return (
     <Pressable onPress={() => router.push('/assistant')} accessibilityRole="button" accessibilityLabel="Ask the Lensio assistant"
       style={{ position: 'absolute', right: space(4), bottom: space(4), borderRadius: 999, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.35, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 8 }}>

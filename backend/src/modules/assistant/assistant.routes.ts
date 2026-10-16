@@ -1,4 +1,6 @@
 import { Router } from 'express';
+import { AppError } from '../../lib/errors';
+import { getSettings } from '../settings/settings.service';
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 import { env } from '../../config/env';
@@ -25,6 +27,7 @@ r.post('/chat', perMinute, perDay, optionalAuth, validate(z.object({
     data: z.string().max(1_400_000, 'That photo is too large. Try again with a smaller photo.').regex(/^[A-Za-z0-9+/=]+$/, 'Unreadable photo'),
   }).optional(),
 })), ah(async (req, res) => {
+  if (!(await getSettings()).assistantEnabled) throw new AppError(403, 'ASSISTANT_OFF', 'Ask Lensio is switched off right now. Please chat with us on WhatsApp.');
   const history = req.body.messages.slice(-12); // recent context is enough and keeps requests small
   const out = await chat(history, req.user?.id ?? null, req.body.image);
   res.json({ ...out, supportWhatsApp: `https://wa.me/${env.SUPPORT_WHATSAPP_NUMBER}` });

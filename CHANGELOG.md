@@ -9,6 +9,14 @@ Server versions are shown in `/v1/config` and the admin header. App versions are
 - **← Back on every screen:** all screens with a header (product, cart, checkout, wishlist, compare, Ask Lensio, orders, eye test, stores, rewards…), the Shop/Orders/Account tabs and the sign-in screen. Goes to the previous screen, or Home when a page was opened directly from a link. Try-on's ← now works when opened from the tab bar. Tested on 12 screens.
 - **Ask Lensio greetings:** understands “Hlo”, “helo”, “hii”, “hai”, “heyy”, “Namaskara”, “good morning” and similar.
 
+## 3.7.0 · Banners per device, feature switches
+- **No double banners:** phones (app and mobile website) show only banners with a mobile picture/video, computers only those with a desktop one; text-only banners show on both. A banner is never shown with the other device's picture.
+- **No mandatory banner fields:** headline is optional. New switch “This picture already has its own text” (for designs with text): the app doesn't write headline/button on it, the whole banner still opens the link.
+- **Banner video sound:** “Sound” switch shows a 🔊 button customers can tap (videos always start muted: browsers require a tap); the carousel stays on that banner while sound is on.
+- **Admin → Settings feature switches:** Find a store (new; hidden in Account, Home, website menu and Ask Lensio when off), Ask Lensio (now honoured by the app and server), Eye test at home, 2D and 3D try-on.
+- Banner admin: clearer optional dates with ✕ to clear, warnings (missing device picture, “Until” before “Show from”, ended); saved banners are read one by one so one bad entry never hides the others.
+- Front light for the AI face scan in the dark (Auto by camera brightness / On / Off) and order alert emails were already in place and are confirmed working.
+
 ## 3.6.0 · Video banners
 - **Banners can be images or videos:** Admin → Banners → 🎬 Add desktop / mobile video (MP4 or WebM, up to 25 MB). Videos play silently on a loop (website: built-in player; app: WebView, no new native module); the images show while a video loads.
 - **Carousel:** changes one by one automatically (images 5.5 s, video banners 9 s), swipe on phones, ‹ › arrows on computers, tap a dot to jump; pauses 12 s after you swipe or tap. Only the banner on screen plays its video (saves data).
