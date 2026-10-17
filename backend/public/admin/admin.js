@@ -752,8 +752,13 @@
       return `<div style="display:grid;gap:6px;align-content:start">
         <b class="small">${D ? '🖥 Desktop (computers)' : '📱 Mobile (app + phone website)'}</b>
         <div style="${box}">
-          ${vid ? `<video src="${esc(vid)}" ${img ? `poster="${esc(img)}"` : ''} autoplay muted loop playsinline style="width:100%;height:100%;object-fit:cover"></video>`
-            : img ? `<img src="${esc(img)}" alt="" style="width:100%;height:100%;object-fit:cover">`
+          ${vid || img ? (() => {
+            const pos = b.focus === 'top' ? 'center top' : b.focus === 'bottom' ? 'center bottom' : 'center';
+            const el = (fit, extra) => vid
+              ? `<video src="${esc(vid)}" ${img ? `poster="${esc(img)}"` : ''} autoplay muted loop playsinline style="position:absolute;inset:0;width:100%;height:100%;object-fit:${fit};object-position:${pos};${extra}"></video>`
+              : `<img src="${esc(img)}" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:${fit};object-position:${pos};${extra}">`;
+            return b.fit === 'whole' ? el('cover', 'filter:blur(18px) brightness(.7);transform:scale(1.15)') + el('contain', '') : el('cover', '');
+          })()
             : `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#A3A8D2" class="small">No ${D ? 'desktop' : 'mobile'} picture: not shown on ${D ? 'computers' : 'phones'}</div>`}
           ${!b.textInImage && (b.title || b.text) && (img || vid) ? `<div style="position:absolute;left:10px;bottom:8px;right:10px;color:#fff;text-shadow:0 1px 6px rgba(0,0,0,.6)"><b>${esc(b.title || '')}</b><div class="small">${esc(b.text || '')}</div></div>` : ''}
         </div>
@@ -783,6 +788,21 @@
         <button class="link" data-act="banMove" data-i="${i}" data-d="-1" ${i === 0 ? 'disabled' : ''}>↑ Up</button>
         <button class="link" data-act="banMove" data-i="${i}" data-d="1" ${i === list.length - 1 ? 'disabled' : ''}>↓ Down</button>
         <button class="link" style="color:#f87171" data-act="banDel" data-i="${i}">🗑 Remove</button></div>
+      <div style="border:1px solid #2a2f6b;border-radius:10px;padding:10px;display:grid;gap:8px">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <b class="small">Any size works:</b>
+          <button class="btn p" data-act="banVid" data-i="${i}" data-k="videoBoth">🎬 One video for both</button>
+          <button class="btn" data-act="banImg" data-i="${i}" data-k="imageBoth">🖼 One picture for both</button>
+          <span class="small muted">used on computers and phones, fitted automatically</span>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center" class="small">
+          <b>Fit:</b>
+          <button class="btn ${b.fit !== 'whole' ? 'p' : ''}" data-act="banFit" data-i="${i}" data-v="fill">Fill the banner</button>
+          <button class="btn ${b.fit === 'whole' ? 'p' : ''}" data-act="banFit" data-i="${i}" data-v="whole">Show the whole video/picture</button>
+          ${b.fit !== 'whole' ? `<label>Keep <select data-bf="${i}:focus">${[['center', 'the middle'], ['top', 'the top'], ['bottom', 'the bottom']].map(([v, l]) => `<option value="${v}" ${(b.focus || 'center') === v ? 'selected' : ''}>${l}</option>`).join('')}</select> when edges are trimmed</label>`
+            : '<span class="muted">Nothing is cut; a soft blurred copy fills the space around it.</span>'}
+        </div>
+      </div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px">${slot(b, i, 'desktop')}${slot(b, i, 'mobile')}</div>
       <label class="check"><input type="checkbox" data-bf="${i}:textInImage" ${b.textInImage ? 'checked' : ''}> <span><b>The pictures already have their own text</b> (don't write anything on them; the whole banner still opens the link)</span></label>
       ${b.textInImage ? '' : `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px">
@@ -1104,6 +1124,7 @@
       if (act === 'banDel') { if (!confirm('Remove this banner?')) return; S.data.banners.splice(+el.dataset.i, 1); return render(); }
       if (act === 'banMove') { const i = +el.dataset.i, j = i + +el.dataset.d, l = S.data.banners; [l[i], l[j]] = [l[j], l[i]]; return render(); }
       if (act === 'banVid') { S.banTarget = { i: +el.dataset.i, k: el.dataset.k }; return $('#banVidFile').click(); }
+      if (act === 'banFit') { S.data.banners[+el.dataset.i].fit = el.dataset.v; return render(); }
       if (act === 'banAudio') { S.banTarget = { i: +el.dataset.i, k: 'audio' }; return $('#banAudioFile').click(); }
       if (act === 'banClear') { S.data.banners[+el.dataset.i][el.dataset.k] = null; return render(); }
       if (act === 'banVidDel') { S.data.banners[+el.dataset.i][el.dataset.k] = null; toast('Removed: tap Save banners'); return render(); }
@@ -1326,7 +1347,7 @@
       if (t.dataset.bf) {
         const [i, k] = t.dataset.bf.split(':'), b = S.data.banners[+i];
         b[k] = t.type === 'checkbox' ? t.checked : t.type === 'datetime-local' ? (t.value ? new Date(t.value).toISOString() : null) : t.value;
-        if (['visible', 'textInImage', 'sound', 'startsAt', 'endsAt'].includes(k)) render();
+        if (['visible', 'textInImage', 'sound', 'startsAt', 'endsAt', 'focus'].includes(k)) render();
         return;
       }
       if (t.id === 'banAudioFile') {
@@ -1365,15 +1386,21 @@
         try {
           toast(`Uploading ${f.name}…`);
           const { url } = await api('/admin/uploads/video', { form: fd });
-          S.data.banners[S.banTarget.i][S.banTarget.k] = url; toast('Video added: tap Save banners'); return render();
+          const bb = S.data.banners[S.banTarget.i];
+          if (S.banTarget.k === 'videoBoth') { bb.videoDesktop = url; bb.videoMobile = url; toast('Video added for computers and phones: tap Save banners'); }
+          else { bb[S.banTarget.k] = url; toast('Video added: tap Save banners'); }
+          return render();
         } catch (e) { return toast(e.message); }
       }
       if (t.id === 'banFile') {
         const f = t.files[0]; t.value = ''; if (!f || !S.banTarget) return;
-        const small = await shrinkImage(f, S.banTarget.k === 'imageMobile' ? 1200 : 2048);
+        const small = await shrinkImage(f, S.banTarget.k === 'imageMobile' ? 1200 : 2048);   // "both": 2048 serves phones too
         if (small !== f) toast(`Shrunk ${Math.round(f.size / 1024)} KB → ${Math.round(small.size / 1024)} KB for fast loading`);
         const [url] = await uploadFiles([small], 'banners'); if (!url) return;
-        S.data.banners[S.banTarget.i][S.banTarget.k] = url; toast('Image added: tap Save banners'); return render();
+        const bb = S.data.banners[S.banTarget.i];
+        if (S.banTarget.k === 'imageBoth') { bb.imageDesktop = url; bb.imageMobile = url; toast('Picture added for computers and phones: tap Save banners'); }
+        else { bb[S.banTarget.k] = url; toast('Image added: tap Save banners'); }
+        return render();
       }
       if (t.dataset.ch !== undefined && S.imp) {
         S.imp.choices = S.imp.choices || {};

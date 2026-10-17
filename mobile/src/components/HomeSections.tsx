@@ -14,7 +14,44 @@ import { useT } from '@/i18n';
 const open = (link: string) => { if (!link) return; if (link.startsWith('/')) router.push(link as never); else Linking.openURL(link); };
 const glass = { backgroundColor: 'rgba(21,27,77,0.62)', borderWidth: 1, borderColor: 'rgba(160,170,255,0.16)', borderRadius: radius.md } as const;
 
-interface Banner { id: string; title: string; text: string; cta: string; link: string; imageDesktop: string | null; imageMobile: string | null; alt: string; videoDesktop?: string | null; videoMobile?: string | null; textInImage?: boolean; sound?: boolean; audio?: string | null }
+interface Banner { id: string; title: string; text: string; cta: string; link: string; imageDesktop: string | null; imageMobile: string | null; alt: string; videoDesktop?: string | null; videoMobile?: string | null; textInImage?: boolean; sound?: boolean; audio?: string | null; fit?: 'fill' | 'whole'; focus?: 'center' | 'top' | 'bottom' }
+type Fit = { fit?: 'fill' | 'whole'; focus?: 'center' | 'top' | 'bottom' };
+const objPos = (focus?: string) => (focus === 'top' ? 'center top' : focus === 'bottom' ? 'center bottom' : 'center');
+
+/**
+ * A picture of any size fitted into the banner: 'fill' covers it (keeping the middle/top/bottom), 'whole' shows all
+ * of it with a soft blurred copy behind, so one upload works for phones and computers.
+ */
+function BannerImage({ src, fit, focus }: { src: string } & Fit) {
+  const [size, setSize] = useState<{ w: number; h: number } | null>(null);
+  const [box, setBox] = useState<{ w: number; h: number } | null>(null);
+  useEffect(() => { if (Platform.OS !== 'web') Image.getSize(src, (w, h) => setSize({ w, h }), () => {}); }, [src]);
+  const fill = { position: 'absolute' as const, width: '100%' as const, height: '100%' as const };
+  if (Platform.OS === 'web') {
+    const img = (f: string, extra: object) => createElement('img', { src, alt: '', 'aria-hidden': true, draggable: false,
+      style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: f, objectPosition: objPos(focus), pointerEvents: 'none', ...extra } });
+    return fit === 'whole'
+      ? <>{img('cover', { filter: 'blur(18px) brightness(.7)', transform: 'scale(1.15)' })}{img('contain', {})}</>
+      : img('cover', {});
+  }
+  if (fit === 'whole') {
+    return <>
+      <Image source={{ uri: src }} style={fill} resizeMode="cover" blurRadius={18} />
+      <View style={[fill, { backgroundColor: 'rgba(4,7,34,0.3)' }]} />
+      <Image source={{ uri: src }} style={fill} resizeMode="contain" accessibilityIgnoresInvertColors />
+    </>;
+  }
+  // 'fill' with top/bottom: size the picture ourselves (React Native's "cover" always keeps the middle)
+  if (focus && focus !== 'center' && size && box) {
+    const scale = Math.max(box.w / size.w, box.h / size.h), w = size.w * scale, h = size.h * scale;
+    return <View style={fill} onLayout={(e) => setBox({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}>
+      <Image source={{ uri: src }} style={{ position: 'absolute', width: w, height: h, left: (box.w - w) / 2, top: focus === 'top' ? 0 : box.h - h }} accessibilityIgnoresInvertColors />
+    </View>;
+  }
+  return <View style={fill} onLayout={(e) => setBox({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}>
+    <Image source={{ uri: src }} style={fill} resizeMode="cover" accessibilityIgnoresInvertColors />
+  </View>;
+}
 
 /** Banner music / voice-over: plays only after the customer taps 🔊 (website: <audio>; app: hidden WebView). */
 function BannerAudio({ src, playing }: { src: string; playing: boolean }) {
@@ -35,21 +72,28 @@ function BannerAudio({ src, playing }: { src: string; playing: boolean }) {
 }
 
 /** Silent looping banner video: the browser's <video> on the website, a WebView in the app (no extra native module). */
-function BannerVideo({ src, poster, muted = true }: { src: string; poster?: string | null; muted?: boolean }) {
+function BannerVideo({ src, poster, muted = true, fit, focus }: { src: string; poster?: string | null; muted?: boolean } & Fit) {
   const fill = { position: 'absolute' as const, width: '100%' as const, height: '100%' as const };
   const webRef = useRef<HTMLVideoElement | null>(null);
   const nativeRef = useRef<WebView>(null);
   // Videos always start muted (browsers block sound until a tap); the 🔊 button switches sound on/off.
   useEffect(() => {
     if (Platform.OS === 'web') { const v = webRef.current; if (v) { v.muted = muted; if (!muted) v.play().catch(() => {}); } }
-    else nativeRef.current?.injectJavaScript(`(function(){var v=document.querySelector('video');if(v){v.muted=${muted};v.play();}})();true;`);
+    else nativeRef.current?.injectJavaScript(`(function(){var v=document.getElementById('main');if(v){v.muted=${muted};v.play();}})();true;`);
   }, [muted]);
   if (Platform.OS === 'web') {
-    return createElement('video', { ref: webRef, src, poster: poster ?? undefined, autoPlay: true, muted: true, loop: true, playsInline: true, preload: 'auto',
-      'aria-hidden': true, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' } });
+    const main = createElement('video', { ref: webRef, src, poster: poster ?? undefined, autoPlay: true, muted: true, loop: true, playsInline: true, preload: 'auto',
+      'aria-hidden': true, style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: fit === 'whole' ? 'contain' : 'cover', objectPosition: objPos(focus), pointerEvents: 'none' } });
+    if (fit !== 'whole') return main;
+    // whole video + a blurred copy behind it (always silent)
+    return <>{createElement('video', { src, autoPlay: true, muted: true, loop: true, playsInline: true, 'aria-hidden': true,
+      style: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', filter: 'blur(18px) brightness(.7)', transform: 'scale(1.15)', pointerEvents: 'none' } })}{main}</>;
   }
-  const html = `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;height:100%;background:#040722;overflow:hidden}video{width:100%;height:100%;object-fit:cover}</style></head>
-     <body><video src="${src.replace(/"/g, '')}" ${poster ? `poster="${poster.replace(/"/g, '')}"` : ''} autoplay muted loop playsinline></video></body></html>`;
+  const safe = src.replace(/"/g, ''), pos = objPos(focus);
+  const html = `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;height:100%;background:#040722;overflow:hidden}
+    video{position:absolute;inset:0;width:100%;height:100%;object-fit:${fit === 'whole' ? 'contain' : 'cover'};object-position:${pos}}
+    #bg{object-fit:cover;filter:blur(18px) brightness(.7);transform:scale(1.15)}</style></head>
+    <body>${fit === 'whole' ? `<video id="bg" src="${safe}" autoplay muted loop playsinline></video>` : ''}<video id="main" src="${safe}" ${poster ? `poster="${poster.replace(/"/g, '')}"` : ''} autoplay muted loop playsinline></video></body></html>`;
   return (
     <View pointerEvents="none" style={fill}>
       <WebView ref={nativeRef} source={{ html }} style={{ flex: 1, backgroundColor: 'transparent' }} originWhitelist={['*']} scrollEnabled={false}
@@ -108,9 +152,9 @@ export function HomeBanners({ width }: { width: number }) {
           return (
             <Pressable key={b.id} onPress={() => open(b.link)} accessibilityRole={b.link ? 'link' : undefined} accessibilityLabel={b.alt || b.title || 'Banner'}
               style={{ width, height: h, borderRadius: radius.lg, overflow: 'hidden' }} accessibilityHint={b.textInImage && b.title ? b.title : undefined}>
-              {img ? <Image source={{ uri: img }} style={{ position: 'absolute', width: '100%', height: '100%' }} resizeMode="cover" accessibilityIgnoresInvertColors />
+              {img ? <BannerImage src={img} fit={b.fit} focus={b.focus} />
                 : <LinearGradient colors={[...gradient]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ position: 'absolute', width: '100%', height: '100%' }} />}
-              {vid && k === i ? <BannerVideo src={vid} poster={img} muted={!(b.sound && soundOn && !b.audio)} /> : null}
+              {vid && k === i ? <BannerVideo src={vid} poster={b.fit === 'whole' ? null : img} muted={!(b.sound && soundOn && !b.audio)} fit={b.fit} focus={b.focus} /> : null}
               {b.audio && b.sound && k === i ? <BannerAudio src={b.audio} playing={soundOn} /> : null}
               {showText(b) ? <LinearGradient colors={['transparent', 'rgba(4,7,34,0.78)']} style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: '70%' }} /> : null}
               {showText(b) ? <View style={{ position: 'absolute', left: space(5), right: space(5), bottom: space(5), gap: space(1) }}>

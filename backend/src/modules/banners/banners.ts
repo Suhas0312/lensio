@@ -22,6 +22,10 @@ export const bannerFields = z.object({
   videoMobile: z.string().url().refine((u) => /^https:\/\//.test(u), 'Use an https link').nullable().optional().default(null),
   // Optional music/voice-over (MP3/M4A): plays only when a customer taps 🔊 (browsers block sound until a tap).
   audio: z.string().url().refine((u) => /^https:\/\//.test(u), 'Use an https link').nullable().optional().default(null),
+  // How a picture/video of any size fits the banner: 'fill' covers it (edges trimmed, keeping `focus`),
+  // 'whole' shows all of it with a blurred copy behind (no bars). One upload can serve phones and computers.
+  fit: z.enum(['fill', 'whole']).optional().default('fill'),
+  focus: z.enum(['center', 'top', 'bottom']).optional().default('center'),
   textInImage: z.boolean().optional().default(false),   // the picture already has its own text: don't write headline/button on it
   sound: z.boolean().optional().default(false),         // video banner: show a 🔊 button customers can tap (always starts muted)
   visible: z.boolean().default(true),

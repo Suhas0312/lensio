@@ -37,3 +37,12 @@ describe('reading saved banners', () => {
     expect(read.length).toBe(2);
   });
 });
+
+describe('one video for both devices', () => {
+  it('keeps fit and focus, with safe defaults', async () => {
+    const { bannerSchema } = await import('./banners');
+    expect(bannerSchema.parse({ id: 'b' })).toMatchObject({ fit: 'fill', focus: 'center' });
+    expect(bannerSchema.parse({ id: 'b', fit: 'whole', focus: 'top' })).toMatchObject({ fit: 'whole', focus: 'top' });
+    expect(bannerSchema.safeParse({ id: 'b', fit: 'stretch' }).success).toBe(false);
+  });
+});

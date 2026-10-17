@@ -9,6 +9,11 @@ Server versions are shown in `/v1/config` and the admin header. App versions are
 - **← Back on every screen:** all screens with a header (product, cart, checkout, wishlist, compare, Ask Lensio, orders, eye test, stores, rewards…), the Shop/Orders/Account tabs and the sign-in screen. Goes to the previous screen, or Home when a page was opened directly from a link. Try-on's ← now works when opened from the tab bar. Tested on 12 screens.
 - **Ask Lensio greetings:** understands “Hlo”, “helo”, “hii”, “hai”, “heyy”, “Namaskara”, “good morning” and similar.
 
+## 3.9.0 · One video (or picture) for both phone and computer
+- **Any size works:** Admin → Banners → 🎬 **One video for both** / 🖼 **One picture for both**: one upload is used on computers and phones and fitted automatically. No need to make exact banner sizes.
+- **Fit:** “Fill the banner” (edges trimmed; keep the middle, top or bottom) or “Show the whole video/picture” (nothing cut; a soft blurred copy fills the space, no black bars). Previews show exactly how it looks on a computer and a phone.
+- Works on the website (built-in player) and in the Android app.
+
 ## Server 3.8.1 · Banner videos play
 - **Fixed blank banner videos (and audio):** the server's security policy allowed pictures from Cloudflare R2 but not videos/audio, so browsers refused to play them. Now allowed (https only), like images. Tested.
 - Admin checks a video before uploading: HEVC/H.265 (iPhone/Mac default, blank on Android/Chrome) and anything the browser can't play are stopped with export advice (H.264 MP4).
