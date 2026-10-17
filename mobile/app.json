@@ -28,7 +28,6 @@
     },
     "android": {
       "package": "in.lensio.app",
-      "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#040722"

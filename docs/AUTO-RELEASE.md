@@ -50,3 +50,12 @@ or from the box when you run it by hand. Otherwise: "Improvements and fixes."
 
 Customers download the APK from this repo's releases, so it must be public. To keep the code private,
 publish releases from a separate public repo instead (ask for help with that change).
+
+## Where the app is built
+
+The APK is built **on GitHub's own machine** (free and unlimited for public repositories), so Expo's monthly
+free-build limit doesn't stop releases. Expo is only used for the app's signing key and version number
+(that's why the `EXPO_TOKEN` secret is still needed). A build takes about 15-30 minutes.
+
+To build on Expo's servers instead (uses Expo's monthly free builds): Actions → Android app release →
+Run workflow → tick "Build on Expo's servers".
