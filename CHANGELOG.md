@@ -9,6 +9,11 @@ Server versions are shown in `/v1/config` and the admin header. App versions are
 - **← Back on every screen:** all screens with a header (product, cart, checkout, wishlist, compare, Ask Lensio, orders, eye test, stores, rewards…), the Shop/Orders/Account tabs and the sign-in screen. Goes to the previous screen, or Home when a page was opened directly from a link. Try-on's ← now works when opened from the tab bar. Tested on 12 screens.
 - **Ask Lensio greetings:** understands “Hlo”, “helo”, “hii”, “hai”, “heyy”, “Namaskara”, “good morning” and similar.
 
+## Server 3.8.1 · Banner videos play
+- **Fixed blank banner videos (and audio):** the server's security policy allowed pictures from Cloudflare R2 but not videos/audio, so browsers refused to play them. Now allowed (https only), like images. Tested.
+- Admin checks a video before uploading: HEVC/H.265 (iPhone/Mac default, blank on Android/Chrome) and anything the browser can't play are stopped with export advice (H.264 MP4).
+- Longer messages stay on screen long enough to read.
+
 ## 3.8.0 · Languages, banner sound, AI reliability
 - **App languages:** Account → Language: English, हिन्दी, ಕನ್ನಡ, தமிழ், తెలుగు, മലയാളം, मराठी, বাংলা, ગુજરાતી, ਪੰਜਾਬੀ, ଓଡ଼ିଆ (phone language picked on first launch, saved on the device). Translated so far: tab bar, Home sections, shop filters and sorting, Account, quick view, Ask Lensio button; other screens next. Ask Lensio replies in the chosen language (AI mode).
 - **Banner sound:** 🎵 upload audio (MP3/M4A, up to 10 MB) per banner, plus “Show the 🔊 sound button”; customers tap to play/mute (audio or the video's own sound); stops when the banner changes.

@@ -44,7 +44,7 @@ export function createApp() {
         fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
         scriptSrc: ["'self'"],
         connectSrc: ["'self'", 'blob:', 'data:'], // web app reads picked photos before uploading
-        mediaSrc: ["'self'", 'blob:'],
+        mediaSrc: ["'self'", 'blob:', 'data:', 'https:'],   // banner videos/audio live on Cloudflare R2 (like images)
         workerSrc: ["'self'", 'blob:'],
         manifestSrc: ["'self'"],
       },
@@ -89,7 +89,7 @@ export function createApp() {
         loyalty: { enabled: s.loyaltyEnabled, pointsPer100: s.loyaltyPointsPer100, maxRedeemPercent: s.loyaltyMaxRedeemPercent, pointValueRupees: 1 },
         firstOrderCoupon: 'FIRST10',
         assistantAi: !!(env.GEMINI_API_KEY || env.GEMINI_API_KEY_2),
-        version: '3.8.0',
+        version: '3.8.1',
       });
     } catch (e) { next(e); }
   });

@@ -23,7 +23,7 @@
 
   const S = { token: localStorage.getItem('lensio.admin.token'), user: null, view: 'products', data: {}, edit: null, login: { step: 'password' }, alerts: { list: [], unseen: 0, since: Date.now() } };
 
-  function toast(m) { const t = $('#toast'); t.textContent = m; t.classList.add('show'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 2800); }
+  function toast(m, ms) { const t = $('#toast'); t.textContent = m; t.classList.add('show'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), ms || Math.max(2800, Math.min(12000, String(m).length * 60))); }
 
   async function api(path, opts = {}) {
     const headers = {};
@@ -1346,6 +1346,21 @@
         const f = t.files[0]; t.value = ''; if (!f || !S.banTarget) return;
         if (!/^video\/(mp4|webm)$/.test(f.type)) return toast('Use an MP4 or WebM video');
         if (f.size > 25 * 1024 * 1024) return toast(`${f.name} is over 25 MB: export a shorter or smaller MP4`);
+        // HEVC (H.265: iPhone/Mac default) plays in Safari but shows blank on Android/Chrome: look inside the file for it.
+        const head = new Uint8Array(await f.slice(0, Math.min(f.size, 4 * 1024 * 1024)).arrayBuffer());
+        const has = (tag) => { const c = [...tag].map((x) => x.charCodeAt(0)); outer: for (let i = 0; i < head.length - 4; i++) { for (let j = 0; j < 4; j++) if (head[i + j] !== c[j]) continue outer; return true; } return false; };
+        if (has('hvc1') || has('hev1')) return toast('This video is HEVC (H.265), the iPhone/Mac default: it shows blank on Android and Chrome. Export it as MP4 with the H.264 codec (HandBrake → “Fast 1080p30”, or Clipchamp/CapCut → MP4), then upload again.', 12000);
+        // Then test-play it here: anything this browser can't show would be blank for customers too.
+        const ok = await new Promise((res) => {
+          const v = document.createElement('video'), url = URL.createObjectURL(f); let done = false;
+          const end = (r) => { if (!done) { done = true; URL.revokeObjectURL(url); res(r); } };
+          v.muted = true; v.preload = 'metadata';
+          v.onloadeddata = () => end(v.videoWidth > 0);
+          v.onerror = () => end(false);
+          setTimeout(() => end(v.readyState >= 1 && v.videoWidth > 0), 8000);
+          v.src = url;
+        });
+        if (!ok) return toast('This video can\'t be shown in browsers (often HEVC/H.265 from iPhone or Mac). Export it as MP4 with the H.264 codec (e.g. HandBrake → “Fast 1080p30”, or Clipchamp/CapCut → MP4), then upload again.', 12000);
         const fd = new FormData(); fd.append('file', f);
         try {
           toast(`Uploading ${f.name}…`);
