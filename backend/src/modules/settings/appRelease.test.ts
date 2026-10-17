@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 const settings: any = { androidApkUrl: 'https://github.com/Suhas0312/lensio/releases/download/v1.0.5/lensio.apk', androidLatestVersion: '1.0.5', androidUpdateNotes: 'old', androidMinVersion: null, androidReleaseRepo: null };
-vi.mock('./settings.service', () => ({ getSettings: async () => settings }));
+const saved: object[] = [];
+vi.mock('./settings.service', () => ({ getSettings: async () => settings, saveSettings: async (p: object) => { saved.push(p); } }));
 vi.mock('../../lib/logger', () => ({ logger: { warn: () => {} } }));
 const { androidRelease, cleanNotes, releaseRepo, _resetReleaseCache } = await import('./appRelease');
 
@@ -56,4 +57,7 @@ describe('automatic Android release from GitHub', () => {
     expect((await androidRelease()).source).toBe('admin');
   });
   it('cleans release notes', () => { expect(cleanNotes('**Full Changelog**: x')).toBeNull(); });
+  it('keeps the backup fields in step with the newest GitHub release', async () => {
+    expect(saved.some((p) => (p as { androidLatestVersion?: string }).androidLatestVersion && (p as { androidLatestVersion: string }).androidLatestVersion !== '2.0.2')).toBe(true);
+  });
 });

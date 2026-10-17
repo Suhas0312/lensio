@@ -19,11 +19,13 @@ import { useAppUpdate } from '@/lib/appUpdate';
 import { useFeatures } from '@/lib/features';
 import { Collections, HomeBanners, RecentlyViewed, ShopByFace, ShopByShape } from '@/components/HomeSections';
 import { DesktopNav, ShopByOccasion } from '@/components/Discovery';
+import { useT } from '@/i18n';
 
 const SHAPES = [['RECTANGLE', 'Rectangle'], ['ROUND', 'Round'], ['CAT_EYE', 'Cat-eye'], ['AVIATOR', 'Aviator'], ['WAYFARER', 'Wayfarer'], ['SQUARE', 'Square']];
 
 export default function Home() {
   const features = useFeatures();
+  const t = useT();
   const { cardW, cols, wide, pad, content } = useLayout();
   const contentW = content - pad * 2;   // banner carousel width
   const [bestsellers, setBestsellers] = useState<Product[]>([]);
@@ -153,8 +155,8 @@ export default function Home() {
         {newest.length ? (
           <View style={{ gap: space(3) }}>
             <Row style={{ justifyContent: 'space-between' }}>
-              <Text v="title">New arrivals</Text>
-              <Pressable onPress={() => router.push({ pathname: '/shop', params: { sort: 'new' } })}><Text v="caption" color={colors.cyan}>See all</Text></Pressable>
+              <Text v="title">{t('newArrivals')}</Text>
+              <Pressable onPress={() => router.push({ pathname: '/shop', params: { sort: 'new' } })}><Text v="caption" color={colors.cyan}>{t('seeAll')}</Text></Pressable>
             </Row>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space(3) }}>
               {newest.slice(0, cols).map((p) => <ProductCard key={p.id} p={p} width={cardW} />)}
@@ -164,8 +166,8 @@ export default function Home() {
 
         <View style={{ gap: space(3) }}>
           <Row style={{ justifyContent: 'space-between' }}>
-            <Text v="title">Bestsellers</Text>
-            <Pressable onPress={() => router.push('/shop')}><Text v="caption" color={colors.cyan}>See all</Text></Pressable>
+            <Text v="title">{t('bestsellers')}</Text>
+            <Pressable onPress={() => router.push('/shop')}><Text v="caption" color={colors.cyan}>{t('seeAll')}</Text></Pressable>
           </Row>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space(3) }}>
             {bestsellers.slice(0, cols * 2).map((p) => <ProductCard key={p.id} p={p} width={cardW} />)}

@@ -22,6 +22,7 @@ r.post('/chat', perMinute, perDay, optionalAuth, validate(z.object({
   messages: z.array(z.object({ role: z.enum(['user', 'assistant']), text: z.string().trim().min(1).max(20000).transform((t) => t.slice(0, 1500)) }))
     .min(1).max(60).refine((m) => m[m.length - 1].role === 'user', 'The last message must be from the customer'),
   // Optional photo with the last question ("Google Lens"-style): glasses, a prescription or a face.
+  lang: z.enum(['en', 'hi', 'kn', 'ta', 'te', 'ml', 'mr', 'bn', 'gu', 'pa', 'or']).optional(),   // app language
   image: z.object({
     mime: z.enum(['image/jpeg', 'image/png', 'image/webp']),
     data: z.string().max(1_400_000, 'That photo is too large. Try again with a smaller photo.').regex(/^[A-Za-z0-9+/=]+$/, 'Unreadable photo'),
@@ -29,7 +30,7 @@ r.post('/chat', perMinute, perDay, optionalAuth, validate(z.object({
 })), ah(async (req, res) => {
   if (!(await getSettings()).assistantEnabled) throw new AppError(403, 'ASSISTANT_OFF', 'Ask Lensio is switched off right now. Please chat with us on WhatsApp.');
   const history = req.body.messages.slice(-12); // recent context is enough and keeps requests small
-  const out = await chat(history, req.user?.id ?? null, req.body.image);
+  const out = await chat(history, req.user?.id ?? null, req.body.image, req.body.lang);
   res.json({ ...out, supportWhatsApp: `https://wa.me/${env.SUPPORT_WHATSAPP_NUMBER}` });
 }));
 

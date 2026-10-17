@@ -5,10 +5,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { gradient, space } from '@/theme';
 import { Text } from './UI';
+import { useT } from '@/i18n';
 
 /** Floating "Ask Lensio" button that opens the AI assistant. */
 export function ChatFab() {
   const { assistant } = useFeatures();
+  const t = useT();
   if (!assistant) return null;     // Ask Lensio switched off in admin → Settings
   return (
     <Pressable onPress={() => router.push('/assistant')} accessibilityRole="button" accessibilityLabel="Ask the Lensio assistant"
@@ -16,7 +18,7 @@ export function ChatFab() {
       <LinearGradient colors={gradient as unknown as string[]} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }}
         style={{ flexDirection: 'row', alignItems: 'center', gap: space(2), paddingHorizontal: space(4), height: 50 }}>
         <Ionicons name="chatbubble-ellipses" size={20} color="#fff" />
-        <Text v="bodyStrong">Ask Lensio</Text>
+        <Text v="bodyStrong">{t('askLensio')}</Text>
       </LinearGradient>
     </Pressable>
   );

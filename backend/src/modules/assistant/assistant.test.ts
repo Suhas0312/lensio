@@ -229,3 +229,37 @@ describe('eye test switch', () => {
     for (const g of ['Hlo', 'helo', 'hii', 'hai', 'hey there']) expect((await chat([{ role: 'user', text: g }], null)).reply).toMatch(/^Hi!/);
   });
 });
+
+describe('Google busy (503 high demand)', () => {
+  it('retries, then moves to another model instead of giving up', async () => {
+    const { env } = await import('../../config/env');
+    const { _resetGeminiModel, _resetGeminiKeys } = await import('./assistant.service');
+    _resetGeminiModel(); _resetGeminiKeys();
+    const e = env as { GEMINI_API_KEY?: string; GEMINI_MODEL: string };
+    const before = e.GEMINI_MODEL; e.GEMINI_API_KEY = 'AIzaKey'; e.GEMINI_MODEL = 'gemini-flash-latest';
+    const calls: string[] = [];
+    vi.stubGlobal('fetch', async (u: string) => {
+      const m = u.split('/models/')[1].split(':')[0]; calls.push(m);
+      return m === 'gemini-flash-latest' ? { ok: false, status: 503, text: async () => 'This model is currently experiencing high demand' }
+        : { ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: 'Answer from another model.' }] } }] }) };
+    });
+    const r = await chat([{ role: 'user', text: 'hi' }], null);
+    e.GEMINI_API_KEY = undefined; e.GEMINI_MODEL = before;
+    expect(r).toMatchObject({ mode: 'ai', reply: 'Answer from another model.' });
+    expect(calls).toEqual(['gemini-flash-latest', 'gemini-flash-latest', 'gemini-3.5-flash']);
+  }, 10000);
+});
+
+describe('app language', () => {
+  it('tells the AI to reply in the language chosen in the app', async () => {
+    const { env } = await import('../../config/env');
+    const { _resetGeminiModel, _resetGeminiKeys } = await import('./assistant.service');
+    _resetGeminiModel(); _resetGeminiKeys();
+    (env as { GEMINI_API_KEY?: string }).GEMINI_API_KEY = 'AIzaKey';
+    let sys = '';
+    vi.stubGlobal('fetch', async (_u: string, init: any) => { sys = JSON.parse(init.body).systemInstruction.parts[0].text; return { ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: 'ನಮಸ್ಕಾರ' }] } }] }) }; });
+    await chat([{ role: 'user', text: 'hi' }], null, undefined, 'kn');
+    (env as { GEMINI_API_KEY?: string }).GEMINI_API_KEY = undefined;
+    expect(sys).toMatch(/Reply in Kannada/);
+  });
+});

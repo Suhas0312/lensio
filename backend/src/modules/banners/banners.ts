@@ -20,6 +20,8 @@ export const bannerFields = z.object({
   // wherever video can't play, so a banner with a video should still have images.
   videoDesktop: z.string().url().refine((u) => /^https:\/\//.test(u), 'Use an https link').nullable().optional().default(null),
   videoMobile: z.string().url().refine((u) => /^https:\/\//.test(u), 'Use an https link').nullable().optional().default(null),
+  // Optional music/voice-over (MP3/M4A): plays only when a customer taps 🔊 (browsers block sound until a tap).
+  audio: z.string().url().refine((u) => /^https:\/\//.test(u), 'Use an https link').nullable().optional().default(null),
   textInImage: z.boolean().optional().default(false),   // the picture already has its own text: don't write headline/button on it
   sound: z.boolean().optional().default(false),         // video banner: show a 🔊 button customers can tap (always starts muted)
   visible: z.boolean().default(true),

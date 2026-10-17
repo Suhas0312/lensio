@@ -13,6 +13,8 @@ import { AccountPhone } from '@/components/AccountPhone';
 import { useAppUpdate } from '@/lib/appUpdate';
 import { useFeatures } from '@/lib/features';
 import { colors, space } from '@/theme';
+import { useT } from '@/i18n';
+import { LanguagePicker } from '@/components/LanguagePicker';
 
 export default function Account() {
   const { user, signOut, setUser } = useAuth();
@@ -23,6 +25,7 @@ export default function Account() {
     api<{ app?: { latestVersion?: string | null } }>('/config').then((c) => setLatestVersion(c.app?.latestVersion ?? null)).catch(() => {});
   }, []);
   const features = useFeatures();
+  const t = useT();
   const [name, setName] = useState(user?.name ?? '');
   const [savingName, setSavingName] = useState(false);
   // The page can open before sign-in finishes: show the saved name as soon as the account loads.
@@ -120,10 +123,11 @@ export default function Account() {
           </Row></Pressable>
         </Card>
       ) : null}
+      <LanguagePicker />
       <Card>
         {[
-          ...(features.eyeTest ? [{ icon: 'home-outline' as const, t: 'Eye test at home', s: 'Book an optometrist visit', to: '/eye-test' }] : []),
-          ...(features.stores ? [{ icon: 'location-outline' as const, t: 'Find a store', s: 'Try frames in person', to: '/stores' }] : []),
+          ...(features.eyeTest ? [{ icon: 'home-outline' as const, t: t('eyeTest'), s: 'Book an optometrist visit', to: '/eye-test' }] : []),
+          ...(features.stores ? [{ icon: 'location-outline' as const, t: t('findStore'), s: 'Try frames in person', to: '/stores' }] : []),
         ].map((x) => (
           <Pressable key={x.t} onPress={() => router.push(x.to)} accessibilityRole="button"><Row>
             <Ionicons name={x.icon} size={22} color={colors.cyan} />
@@ -136,7 +140,7 @@ export default function Account() {
       <Card>
         <Pressable onPress={chat} accessibilityRole="button"><Row>
           <Ionicons name="logo-whatsapp" size={22} color={colors.success} />
-          <View style={{ flex: 1 }}><Text v="bodyStrong">Chat with us on WhatsApp</Text><Text v="caption" color={colors.muted}>Prescription questions, order help, fit advice</Text></View>
+          <View style={{ flex: 1 }}><Text v="bodyStrong">{t('chatWhatsApp')}</Text><Text v="caption" color={colors.muted}>Prescription questions, order help, fit advice</Text></View>
         </Row></Pressable>
       </Card>
 
@@ -146,12 +150,12 @@ export default function Account() {
         <Card>
           <Pressable onPress={() => router.push('/wishlist')} accessibilityRole="button"><Row>
             <Ionicons name="heart" size={22} color="#e11d48" />
-            <View style={{ flex: 1 }}><Text v="bodyStrong">My wishlist</Text><Text v="caption" color={colors.muted}>Frames you saved with ♥</Text></View>
+            <View style={{ flex: 1 }}><Text v="bodyStrong">{t('myWishlist')}</Text><Text v="caption" color={colors.muted}>Frames you saved with ♥</Text></View>
             <Ionicons name="chevron-forward" size={18} color={colors.muted} />
           </Row></Pressable>
           <Pressable onPress={() => router.push('/compare')} accessibilityRole="button" style={{ marginTop: space(4) }}><Row>
             <Ionicons name="git-compare-outline" size={22} color={colors.violet} />
-            <View style={{ flex: 1 }}><Text v="bodyStrong">Compare frames</Text><Text v="caption" color={colors.muted}>Up to 3 frames side by side</Text></View>
+            <View style={{ flex: 1 }}><Text v="bodyStrong">{t('compareFrames')}</Text><Text v="caption" color={colors.muted}>Up to 3 frames side by side</Text></View>
             <Ionicons name="chevron-forward" size={18} color={colors.muted} />
           </Row></Pressable>
         </Card>

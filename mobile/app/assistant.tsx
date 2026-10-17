@@ -3,6 +3,7 @@ import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Linking, Platfor
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { useFeatures } from '@/lib/features';
+import { useLang } from '@/i18n';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -68,7 +69,7 @@ function AssistantChat() {
       const history = [...useAssistant.getState().messages].filter((m) => m.id !== 'hello' && !m.failed).slice(-12)
         .map((m) => ({ role: m.role, text: m.text }));
       const r = await api<{ reply: string; products: ProductCard[]; handoff: boolean; supportWhatsApp: string }>('/assistant/chat', {
-        body: { messages: history, ...(pic ? { image: { mime: 'image/jpeg', data: pic.base64 } } : {}) },
+        body: { messages: history, lang: useLang.getState().lang, ...(pic ? { image: { mime: 'image/jpeg', data: pic.base64 } } : {}) },
       });
       setWhatsapp(r.supportWhatsApp);
       add({ id: id(), role: 'assistant', text: r.reply, products: r.products, handoff: r.handoff });

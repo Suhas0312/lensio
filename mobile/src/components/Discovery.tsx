@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, radius, space } from '@/theme';
 import { useFeatures } from '@/lib/features';
 import { Text } from './UI';
+import { useT } from '@/i18n';
 
 const glass = { borderRadius: radius.md, borderWidth: 1, borderColor: 'rgba(160,170,255,0.16)', backgroundColor: 'rgba(21,27,77,0.62)' } as const;
 type Params = Record<string, string>;
@@ -21,9 +22,10 @@ const OCCASIONS: { icon: keyof typeof Ionicons.glyphMap; title: string; sub: str
 ];
 
 export function ShopByOccasion() {
+  const t = useT();
   return (
     <View style={{ gap: space(3) }}>
-      <Text v="heading">Shop by occasion</Text>
+      <Text v="heading">{t('shopByOccasion')}</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space(3) }}>
         {OCCASIONS.map((o) => (
           <Pressable key={o.title} onPress={() => router.push({ pathname: '/shop', params: o.params })} accessibilityRole="button" accessibilityLabel={`${o.title}: ${o.sub}`}

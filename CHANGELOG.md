@@ -9,6 +9,14 @@ Server versions are shown in `/v1/config` and the admin header. App versions are
 - **← Back on every screen:** all screens with a header (product, cart, checkout, wishlist, compare, Ask Lensio, orders, eye test, stores, rewards…), the Shop/Orders/Account tabs and the sign-in screen. Goes to the previous screen, or Home when a page was opened directly from a link. Try-on's ← now works when opened from the tab bar. Tested on 12 screens.
 - **Ask Lensio greetings:** understands “Hlo”, “helo”, “hii”, “hai”, “heyy”, “Namaskara”, “good morning” and similar.
 
+## 3.8.0 · Languages, banner sound, AI reliability
+- **App languages:** Account → Language: English, हिन्दी, ಕನ್ನಡ, தமிழ், తెలుగు, മലയാളം, मराठी, বাংলা, ગુજરાતી, ਪੰਜਾਬੀ, ଓଡ଼ିଆ (phone language picked on first launch, saved on the device). Translated so far: tab bar, Home sections, shop filters and sorting, Account, quick view, Ask Lensio button; other screens next. Ask Lensio replies in the chosen language (AI mode).
+- **Banner sound:** 🎵 upload audio (MP3/M4A, up to 10 MB) per banner, plus “Show the 🔊 sound button”; customers tap to play/mute (audio or the video's own sound); stops when the banner changes.
+- **Banner editor rebuilt:** 🖥 desktop and 📱 mobile side by side in one banner, 🔗 Combine two half-banners, dates hidden behind “Show only between dates”, nothing mandatory, new banners start blank and visible. Images shrink automatically on upload (your 2.1 MB designs → ~0.3 MB).
+- **AI keys “503 high demand”:** not a key problem; Lensio now retries once and switches to other current models within ~8 s, then uses built-in answers. Test AI keys explains it.
+- **App version backup fields** follow the newest GitHub release automatically and are folded away (they showed an old 2.0.2).
+- **Carousel fix:** its own movement no longer counts as a customer swipe (uneven timing on the website).
+
 ## 3.7.0 · Banners per device, feature switches
 - **No double banners:** phones (app and mobile website) show only banners with a mobile picture/video, computers only those with a desktop one; text-only banners show on both. A banner is never shown with the other device's picture.
 - **No mandatory banner fields:** headline is optional. New switch “This picture already has its own text” (for designs with text): the app doesn't write headline/button on it, the whole banner still opens the link.

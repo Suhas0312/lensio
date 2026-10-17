@@ -255,6 +255,20 @@ r.post('/uploads/video', adminOnly, videoUpload.single('file'), ah(async (req, r
   res.status(201).json({ url: await putPublicFile('banners', req.file.buffer, req.file.mimetype) });
 }));
 
+/** Banner audio: MP3 / M4A / AAC / OGG, up to 10 MB. */
+const audioUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (['audio/mpeg', 'audio/mp4', 'audio/x-m4a', 'audio/aac', 'audio/ogg'].includes(file.mimetype)) cb(null, true);
+    else cb(badRequest('BAD_FILE_TYPE', 'Upload an MP3, M4A, AAC or OGG audio file'));
+  },
+});
+r.post('/uploads/audio', adminOnly, audioUpload.single('file'), ah(async (req, res) => {
+  if (!req.file) throw badRequest('NO_FILE', 'Choose an audio file to upload');
+  res.status(201).json({ url: await putPublicFile('banners', req.file.buffer, req.file.mimetype) });
+}));
+
 r.post('/uploads', adminOnly, imageUpload.single('file'), ah(async (req, res) => {
   if (!req.file) throw badRequest('NO_FILE', 'Choose an image to upload');
   const folder = req.body.kind === 'tryon' ? 'tryon' : req.body.kind === 'settings' ? 'settings' : req.body.kind === 'banners' ? 'banners' : req.body.kind === 'models' ? 'models' : 'products';

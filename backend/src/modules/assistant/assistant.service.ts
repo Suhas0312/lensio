@@ -154,14 +154,28 @@ export const _resetGeminiModel = () => { workingModel = null; };
 async function callGemini(key: string, system: string, contents: object[]): Promise<string> {
   const models = workingModel ? [workingModel, ...geminiModels().filter((m) => m !== workingModel)] : geminiModels();
   let last: unknown;
-  for (const model of models) {
+  // Busy/temporary errors (503 "high demand", 500, 502, 504), slow answers and retired models (404) move on to the
+  // next model. Only ONE short retry per question, and at most ~8 s in total, so customers are never kept waiting
+  // (the built-in answers take over after that). Key problems (400/401/403) and limits (429) stop here (next key).
+  const TEMP = new Set([500, 502, 503, 504]);
+  const deadline = Date.now() + 8000;
+  let retried = false;
+  for (let m = 0; m < models.length && Date.now() < deadline; m++) {
+    const model = models[m];
     try {
       const text = await callModel(model, key, system, contents);
       workingModel = model;
       return text;
     } catch (e) {
       last = e;
-      if ((e as { status?: number }).status !== 404) throw e;      // only "model not found" moves to the next model
+      const st = (e as { status?: number }).status;
+      if (st === 404) continue;
+      if (st !== undefined && TEMP.has(st)) {
+        if (!retried && Date.now() + 1200 < deadline) { retried = true; await new Promise((r) => setTimeout(r, 1200)); m--; }
+        continue;
+      }
+      if (st === undefined && /abort|timeout/i.test(String((e as Error).name) + (e as Error).message)) continue;
+      throw e;
     }
   }
   throw last;
@@ -172,7 +186,7 @@ async function callModel(model: string, key: string, system: string, contents: o
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
     body: JSON.stringify({ systemInstruction: { parts: [{ text: system }] }, contents, generationConfig: { temperature: 0.4, maxOutputTokens: 600 } }),
-    signal: AbortSignal.timeout(25_000),
+    signal: AbortSignal.timeout(12_000),   // a slow model must not hold the customer up
   });
   if (!r.ok) { const e = new Error(`Gemini ${r.status}: ${(await r.text()).slice(0, 300)}`) as Error & { status?: number }; e.status = r.status; throw e; }
   const j = (await r.json()) as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
@@ -187,6 +201,7 @@ export async function testGeminiKeys() {
     status === 400 && /api key not valid|API_KEY_INVALID/i.test(msg) ? 'Key not valid: create a new key at aistudio.google.com → Get API key (it starts with "AIza").'
       : status === 403 ? 'Key refused: the Gemini API is not enabled for this key, or the key is restricted. Create a new key in AI Studio.'
       : status === 429 ? 'Free limit reached for now: it resets later (or add a backup key from a different Google account).'
+      : status === 503 || status === 500 || status === 502 || status === 504 ? 'Your key is fine: Google’s AI is very busy right now (“high demand”). Lensio retries and switches models automatically; customers get the built-in answers meanwhile. Try the test again in a few minutes.'
       : status === 404 ? `None of the Gemini models (${geminiModels().join(', ')}) is available for this key. Check the key in AI Studio, or set GEMINI_MODEL in Render to a model your key lists.`
       : `Google answered ${status ?? 'with an error'}: ${msg.slice(0, 120)}`;
   const out: { name: string; set: boolean; looksRight: boolean; ok: boolean; message: string }[] = [];
@@ -370,12 +385,15 @@ function photoFallback(q: string, c: Ctx) {
   return `I can't look at photos right now, but the ✨ AI face scan in the Try on tab reads your face shape, size and PD and picks frames that suit you, in about 10 seconds.${top ? ` Popular right now: ${top}.` : ''} You can also tell me your face shape or a style, like "black rectangle frames under 2000".`;
 }
 
-export async function chat(history: ChatMessage[], userId: string | null, image?: ChatImage): Promise<ChatReply> {
+const LANG_NAMES: Record<string, string> = { en: 'English', hi: 'Hindi', kn: 'Kannada', ta: 'Tamil', te: 'Telugu', ml: 'Malayalam', mr: 'Marathi', bn: 'Bengali', gu: 'Gujarati', pa: 'Punjabi', or: 'Odia' };
+
+export async function chat(history: ChatMessage[], userId: string | null, image?: ChatImage, lang?: string): Promise<ChatReply> {
   const ctx = await buildContext(userId, history[history.length - 1]?.text ?? '', !!image);
   const last = history[history.length - 1]?.text ?? '';
   let reply: string; let mode: ChatReply['mode'] = 'basic';
   if (geminiKeys().length) {
-    try { reply = await askGemini(systemPrompt(ctx), history, image); mode = 'ai'; }
+    const langLine = lang && lang !== 'en' && LANG_NAMES[lang] ? `\n\nLANGUAGE: the customer chose ${LANG_NAMES[lang]} in the app. Reply in ${LANG_NAMES[lang]} (in its own script), unless they write to you in another language; keep frame names, prices and codes as they are.` : '';
+    try { reply = await askGemini(systemPrompt(ctx) + langLine, history, image); mode = 'ai'; }
     catch (err) { logger.warn({ err }, 'Assistant AI failed; using basic answers'); reply = image ? photoFallback(last, ctx) : basicAnswer(last, ctx); }
   } else {
     reply = image ? photoFallback(last, ctx) : basicAnswer(last, ctx);

@@ -9,11 +9,30 @@ import { Row, Text } from '@/components/UI';
 import { inr } from '@/lib/format';
 import { useRecent } from '@/lib/recent';
 import { colors, gradient, radius, space } from '@/theme';
+import { useT } from '@/i18n';
 
 const open = (link: string) => { if (!link) return; if (link.startsWith('/')) router.push(link as never); else Linking.openURL(link); };
 const glass = { backgroundColor: 'rgba(21,27,77,0.62)', borderWidth: 1, borderColor: 'rgba(160,170,255,0.16)', borderRadius: radius.md } as const;
 
-interface Banner { id: string; title: string; text: string; cta: string; link: string; imageDesktop: string | null; imageMobile: string | null; alt: string; videoDesktop?: string | null; videoMobile?: string | null; textInImage?: boolean; sound?: boolean }
+interface Banner { id: string; title: string; text: string; cta: string; link: string; imageDesktop: string | null; imageMobile: string | null; alt: string; videoDesktop?: string | null; videoMobile?: string | null; textInImage?: boolean; sound?: boolean; audio?: string | null }
+
+/** Banner music / voice-over: plays only after the customer taps 🔊 (website: <audio>; app: hidden WebView). */
+function BannerAudio({ src, playing }: { src: string; playing: boolean }) {
+  const webRef = useRef<HTMLAudioElement | null>(null);
+  const nativeRef = useRef<WebView>(null);
+  useEffect(() => {
+    if (Platform.OS === 'web') { const a = webRef.current; if (a) { if (playing) a.play().catch(() => {}); else a.pause(); } }
+    else nativeRef.current?.injectJavaScript(`(function(){var a=document.querySelector('audio');if(a){${playing ? 'a.play();' : 'a.pause();'}}})();true;`);
+  }, [playing]);
+  useEffect(() => () => { webRef.current?.pause(); }, []);
+  if (Platform.OS === 'web') return createElement('audio', { ref: webRef, src, loop: true, preload: 'none' });
+  return (
+    <View pointerEvents="none" style={{ position: 'absolute', width: 1, height: 1, opacity: 0 }}>
+      <WebView ref={nativeRef} source={{ html: `<audio src="${src.replace(/"/g, '')}" loop preload="auto"></audio>` }} originWhitelist={['*']}
+        mediaPlaybackRequiresUserAction={false} javaScriptEnabled />
+    </View>
+  );
+}
 
 /** Silent looping banner video: the browser's <video> on the website, a WebView in the app (no extra native module). */
 function BannerVideo({ src, poster, muted = true }: { src: string; poster?: string | null; muted?: boolean }) {
@@ -57,7 +76,8 @@ export function HomeBanners({ width }: { width: number }) {
   });
   useEffect(() => { cachedApi<Banner[]>('/catalog/banners', setList).then(setList).catch(() => {}); }, []);
   useEffect(() => { setI(0); ref.current?.scrollTo({ x: 0, animated: false }); }, [wide]);   // phone ↔ desktop: start again
-  const goTo = (n: number) => { const k = (n + list.length) % list.length; setI(k); ref.current?.scrollTo({ x: k * width, animated: true }); };
+  const autoUntil = useRef(0);   // our own scrolling, not a customer's swipe
+  const goTo = (n: number) => { const k = (n + list.length) % list.length; autoUntil.current = Date.now() + 900; setI(k); ref.current?.scrollTo({ x: k * width, animated: true }); };
   const [pausedAt, setPausedAt] = useState(0);   // a swipe or arrow tap pauses the automatic change for a while
   const [soundOn, setSoundOn] = useState(false);  // customer tapped 🔊 on a video banner
   // Auto-advance one by one: images every 5.5 s, video banners stay 9 s so the clip can play.
@@ -72,7 +92,12 @@ export function HomeBanners({ width }: { width: number }) {
   useEffect(() => { setSoundOn(false); }, [i]);   // sound never carries over to the next banner
   if (!list.length || width <= 0) return null;
   const h = wide ? Math.round(width / 2.67) : Math.round(width * 0.62);
-  const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => { const k = Math.round(e.nativeEvent.contentOffset.x / width); if (k !== i) { setI(k); setPausedAt(Date.now()); } };
+  // Only a real swipe pauses the automatic change (the carousel's own movement used to count as a swipe → uneven timing).
+  const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (Date.now() < autoUntil.current) return;
+    const k = Math.round(e.nativeEvent.contentOffset.x / width);
+    if (k !== i && k >= 0 && k < list.length) { setI(k); setPausedAt(Date.now()); }
+  };
   return (
     <View style={{ gap: space(2), position: 'relative' }}>
       <ScrollView ref={ref} horizontal pagingEnabled showsHorizontalScrollIndicator={false} onMomentumScrollEnd={onScroll} onScroll={Platform.OS === 'web' ? onScroll : undefined} scrollEventThrottle={64}
@@ -85,15 +110,16 @@ export function HomeBanners({ width }: { width: number }) {
               style={{ width, height: h, borderRadius: radius.lg, overflow: 'hidden' }} accessibilityHint={b.textInImage && b.title ? b.title : undefined}>
               {img ? <Image source={{ uri: img }} style={{ position: 'absolute', width: '100%', height: '100%' }} resizeMode="cover" accessibilityIgnoresInvertColors />
                 : <LinearGradient colors={[...gradient]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ position: 'absolute', width: '100%', height: '100%' }} />}
-              {vid && k === i ? <BannerVideo src={vid} poster={img} muted={!(b.sound && soundOn)} /> : null}
+              {vid && k === i ? <BannerVideo src={vid} poster={img} muted={!(b.sound && soundOn && !b.audio)} /> : null}
+              {b.audio && b.sound && k === i ? <BannerAudio src={b.audio} playing={soundOn} /> : null}
               {showText(b) ? <LinearGradient colors={['transparent', 'rgba(4,7,34,0.78)']} style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: '70%' }} /> : null}
               {showText(b) ? <View style={{ position: 'absolute', left: space(5), right: space(5), bottom: space(5), gap: space(1) }}>
                 {b.title ? <Text v="title" color="#fff">{b.title}</Text> : null}
                 {b.text ? <Text color="#E5E7FF">{b.text}</Text> : null}
                 {b.cta && b.link ? <View style={{ alignSelf: 'flex-start', backgroundColor: '#fff', borderRadius: radius.pill, paddingHorizontal: space(4), paddingVertical: space(2), marginTop: space(2) }}><Text v="bodyStrong" color={colors.violet}>{b.cta} →</Text></View> : null}
               </View> : null}
-              {vid && b.sound && k === i ? (
-                <Pressable onPress={() => { setSoundOn((x) => !x); setPausedAt(Date.now()); }} hitSlop={8} accessibilityRole="button" accessibilityLabel={soundOn ? 'Mute video' : 'Play video with sound'}
+              {(vid || b.audio) && b.sound && k === i ? (
+                <Pressable onPress={() => { setSoundOn((x) => !x); setPausedAt(Date.now()); }} hitSlop={8} accessibilityRole="button" accessibilityLabel={soundOn ? 'Mute sound' : 'Play sound'}
                   style={{ position: 'absolute', right: space(3), bottom: space(3), width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(4,7,34,0.6)', alignItems: 'center', justifyContent: 'center' }}>
                   <Ionicons name={soundOn ? 'volume-high' : 'volume-mute'} size={20} color="#fff" />
                 </Pressable>
@@ -129,9 +155,10 @@ function SectionTitle({ title, action, onAction }: { title: string; action?: str
 const SHAPES: [string, string][] = [['RECTANGLE', 'Rectangle'], ['ROUND', 'Round'], ['CAT_EYE', 'Cat-eye'], ['AVIATOR', 'Aviator'], ['WAYFARER', 'Wayfarer'], ['SQUARE', 'Square'], ['OVAL', 'Oval'], ['GEOMETRIC', 'Geometric']];
 /** Shop by frame shape: drawn frame tiles → Shop filtered by that shape. */
 export function ShopByShape() {
+  const t = useT();
   return (
     <View style={{ gap: space(3) }}>
-      <SectionTitle title="Shop by frame shape" />
+      <SectionTitle title={t('shopByShape')} />
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space(3) }}>
         {SHAPES.map(([k, l]) => (
           <Pressable key={k} onPress={() => router.push({ pathname: '/shop', params: { shape: k } })} accessibilityRole="button" accessibilityLabel={`${l} frames`}
@@ -156,9 +183,10 @@ const FACES: { face: string; best: string; label: string; tip: string }[] = [
 ];
 /** Shop by face shape, with a shortcut to the AI face scan for customers who don't know theirs. */
 export function ShopByFace() {
+  const t = useT();
   return (
     <View style={{ gap: space(3) }}>
-      <SectionTitle title="Shop by face shape" action="Not sure? Scan my face →" onAction={() => router.push('/tryon')} />
+      <SectionTitle title={t('shopByFace')} action={t('notSureScan')} onAction={() => router.push('/tryon')} />
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space(3) }}>
         {FACES.map((f) => (
           <Pressable key={f.face} onPress={() => router.push({ pathname: '/shop', params: { shape: f.best } })} accessibilityRole="button" accessibilityLabel={`Frames for a ${f.face.toLowerCase()} face`}
@@ -181,9 +209,10 @@ const COLLECTIONS: { t: string; icon: keyof typeof Ionicons.glyphMap; params: Re
 ];
 /** Collections: who it's for, type and material. */
 export function Collections() {
+  const t = useT();
   return (
     <View style={{ gap: space(3) }}>
-      <SectionTitle title="Collections" action="All frames" onAction={() => router.push('/shop')} />
+      <SectionTitle title={t('collections')} action={t('allFrames')} onAction={() => router.push('/shop')} />
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space(3) }}>
         {COLLECTIONS.map((c) => (
           <Pressable key={c.t} onPress={() => router.push({ pathname: '/shop', params: c.params })} accessibilityRole="button"
@@ -198,14 +227,15 @@ export function Collections() {
 }
 
 /** Recently viewed frames (this device). */
-export function RecentlyViewed({ excludeId, title = 'Recently viewed' }: { excludeId?: string; title?: string }) {
+export function RecentlyViewed({ excludeId, title }: { excludeId?: string; title?: string }) {
+  const t = useT();
   const { items, init } = useRecent();
   useEffect(() => { init(); }, [init]);
   const list = items.filter((x) => x.id !== excludeId);
   if (!list.length) return null;
   return (
     <View style={{ gap: space(3) }}>
-      <SectionTitle title={title} />
+      <SectionTitle title={title ?? t('recentlyViewed')} />
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space(3) }}>
         {list.map((p) => (
           <Pressable key={p.id} onPress={() => router.push(`/product/${p.slug}`)} accessibilityRole="button" accessibilityLabel={`${p.name}, ${inr(p.price)}`}

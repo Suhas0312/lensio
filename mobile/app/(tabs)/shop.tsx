@@ -18,17 +18,19 @@ import { parseVoiceQuery } from '@/lib/voiceQuery';
 import { inr } from '@/lib/format';
 import { colors, radius, space } from '@/theme';
 import { titleCase } from '@/lib/format';
+import { useT } from '@/i18n';
 
 const SHAPES = ['RECTANGLE', 'ROUND', 'CAT_EYE', 'AVIATOR', 'WAYFARER', 'SQUARE', 'OVAL', 'GEOMETRIC'];
 const SIZES = ['SMALL', 'MEDIUM', 'WIDE'];
-const FOR = [['MEN', 'Men'], ['WOMEN', 'Women'], ['KIDS', 'Kids']];
+const FOR = [['MEN', 'men'], ['WOMEN', 'women'], ['KIDS', 'kids']] as const;
 const MATERIALS = [['ACETATE', 'Acetate'], ['METAL', 'Metal'], ['TITANIUM', 'Titanium'], ['TR90', 'TR90 (flexible)']];
 /** Price ranges in paise: [label, min, max] */
 const PRICES: [string, number | undefined, number | undefined][] = [['Under ₹1,000', undefined, 99999], ['₹1,000–2,000', 100000, 200000], ['₹2,000–3,000', 200000, 300000], ['Above ₹3,000', 300000, undefined]];
-const SORTS = [['popular', 'Popular'], ['price_asc', 'Price: low to high'], ['price_desc', 'Price: high to low'], ['new', 'New']];
+const SORTS = [['popular', 'popular'], ['price_asc', 'priceLow'], ['price_desc', 'priceHigh'], ['new', 'new']] as const;
 
 export default function Shop() {
   const { cardW, cols, pad } = useLayout();
+  const t = useT();
   const listCols = cols >= 4 ? 2 : 1;   // list view: two rows side by side on wide screens
   const params = useLocalSearchParams<{ shape?: string; size?: string; voice?: string; rx?: string; sort?: string; gender?: string; kind?: string; material?: string; color?: string; brand?: string; q?: string }>();
   const [q, setQ] = useState(params.q ?? '');
@@ -103,7 +105,7 @@ export default function Shop() {
     <View style={{ gap: space(3), paddingBottom: space(4) }}>
       <DesktopNav />
       <Row style={{ alignItems: 'flex-end' }}>
-        <View style={{ flex: 1 }}><Field label="Search" placeholder="Frame name, brand or code, or tap 🎤 and speak" value={q} onChangeText={(t) => { setQ(t); setSuggestOpen(true); }} returnKeyType="search"
+        <View style={{ flex: 1 }}><Field label={t('search')} placeholder="Frame name, brand or code, or tap 🎤 and speak" value={q} onChangeText={(t) => { setQ(t); setSuggestOpen(true); }} returnKeyType="search"
           onSubmitEditing={() => setSuggestOpen(false)} onBlur={() => setTimeout(() => setSuggestOpen(false), 200)} /></View>
         <View style={{ paddingBottom: 3 }}><VoiceButton onPartial={setHeard} onFinal={applyVoice} /></View>
       </Row>
@@ -135,16 +137,16 @@ export default function Shop() {
         </Row>
       ) : null}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space(2) }}>
-        <Chip label="All" selected={kind === 'all'} onPress={() => setKind('all')} />
-        <Chip label="Eyeglasses" selected={kind === 'eyeglasses'} onPress={() => setKind('eyeglasses')} />
-        <Chip label="Sunglasses" selected={kind === 'sunglasses'} onPress={() => setKind('sunglasses')} />
+        <Chip label={t('all')} selected={kind === 'all'} onPress={() => setKind('all')} />
+        <Chip label={t('eyeglasses')} selected={kind === 'eyeglasses'} onPress={() => setKind('eyeglasses')} />
+        <Chip label={t('sunglasses')} selected={kind === 'sunglasses'} onPress={() => setKind('sunglasses')} />
         {SIZES.map((s) => <Chip key={s} label={titleCase(s)} selected={size === s} onPress={() => setSize(size === s ? undefined : s)} />)}
       </ScrollView>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space(2) }}>
         {SHAPES.map((s) => <Chip key={s} label={titleCase(s)} selected={shape === s} onPress={() => setShape(shape === s ? undefined : s)} />)}
       </ScrollView>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space(2) }}>
-        {FOR.map(([k, l]) => <Chip key={k} label={l} selected={gender === k} onPress={() => setGender(gender === k ? undefined : k)} />)}
+        {FOR.map(([k, l]) => <Chip key={k} label={t(l)} selected={gender === k} onPress={() => setGender(gender === k ? undefined : k)} />)}
         {MATERIALS.map(([k, l]) => <Chip key={k} label={l} selected={material === k} onPress={() => setMaterial(material === k ? undefined : k)} />)}
       </ScrollView>
       {facets.colours.length > 1 ? (
@@ -170,7 +172,7 @@ export default function Shop() {
         })}
       </ScrollView>
       <Row style={{ justifyContent: 'space-between' }}>
-        <Text v="caption" color={colors.muted}>{total != null ? `${total} frames` : ' '}</Text>
+        <Text v="caption" color={colors.muted}>{total != null ? `${total} ${t('frames')}` : ' '}</Text>
         <Row style={{ gap: space(1) }}>
           {(['grid', 'list'] as const).map((l) => (
             <Pressable key={l} onPress={() => setLayout(l)} accessibilityRole="button" accessibilityState={{ selected: layout === l }} accessibilityLabel={l === 'grid' ? 'Grid view' : 'List view'}
@@ -181,7 +183,7 @@ export default function Shop() {
         </Row>
       </Row>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space(2) }}>
-        {SORTS.map(([k, l]) => <Chip key={k} label={l} selected={sort === k} onPress={() => setSort(k)} />)}
+        {SORTS.map(([k, l]) => <Chip key={k} label={t(l)} selected={sort === k} onPress={() => setSort(k)} />)}
       </ScrollView>
     </View>
   );
@@ -202,7 +204,7 @@ export default function Shop() {
           <View style={{ alignItems: 'center', gap: space(3), paddingBottom: 90 }}>
             {loading && items.length ? <ActivityIndicator color={colors.violet} /> : null}
             {items.length && total ? <Text v="caption" color={colors.muted}>Showing {items.length} of {total} frames</Text> : null}
-            {!loading && page < pages ? <Button kind="secondary" title="Show more frames" onPress={() => load(page + 1)} /> : null}
+            {!loading && page < pages ? <Button kind="secondary" title={t('showMore')} onPress={() => load(page + 1)} /> : null}
           </View>
         }
       />

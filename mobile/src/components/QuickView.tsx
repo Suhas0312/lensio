@@ -6,10 +6,12 @@ import { inr, titleCase } from '@/lib/format';
 import { useCompare, useWishlist } from '@/store/shopping';
 import { colors, radius, space } from '@/theme';
 import { Button, Text } from './UI';
+import { useT } from '@/i18n';
 
 /** Quick view: the key facts of a frame without leaving the list (photo, price, colours, sizes, size in mm). */
 export function QuickView({ p, onClose }: { p: Product | null; onClose: () => void }) {
   const { width } = useWindowDimensions();
+  const t = useT();
   const liked = useWishlist((s) => (p ? s.ids.has(p.id) : false)), toggleLike = useWishlist((s) => s.toggle);
   const comparing = useCompare((s) => (p ? s.items.some((x) => x.id === p.id) : false)), toggleCompare = useCompare((s) => s.toggle);
   if (!p) return null;
@@ -24,7 +26,7 @@ export function QuickView({ p, onClose }: { p: Product | null; onClose: () => vo
         <Pressable onPress={() => {}} style={{ width: Math.min(width, 520), maxHeight: '90%', backgroundColor: colors.surface, borderRadius: radius.lg, borderBottomLeftRadius: width >= 700 ? radius.lg : 0, borderBottomRightRadius: width >= 700 ? radius.lg : 0, overflow: 'hidden' }}>
           <ScrollView contentContainerStyle={{ padding: space(5), gap: space(3) }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Text v="caption" color={colors.muted}>Quick view</Text>
+              <Text v="caption" color={colors.muted}>{t('quickView')}</Text>
               <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button" accessibilityLabel="Close"><Ionicons name="close" size={24} color={colors.text} /></Pressable>
             </View>
             <View style={{ backgroundColor: '#F4F5FB', borderRadius: radius.md, aspectRatio: 1.6, overflow: 'hidden' }}>
@@ -56,7 +58,7 @@ export function QuickView({ p, onClose }: { p: Product | null; onClose: () => vo
                 <Ionicons name="git-compare-outline" size={22} color={comparing ? colors.violet : colors.text} /><Text v="caption">{comparing ? 'Comparing' : 'Compare'}</Text>
               </Pressable>
             </View>
-            <Button title="View full details" onPress={() => go(() => router.push(`/product/${p.slug}`))} />
+            <Button title={t('viewDetails')} onPress={() => go(() => router.push(`/product/${p.slug}`))} />
             <Button kind="secondary" title="👓 Try on" onPress={() => go(() => router.push({ pathname: '/tryon', params: { frame: p.slug } }))} />
           </ScrollView>
         </Pressable>

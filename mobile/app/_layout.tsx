@@ -12,6 +12,7 @@ import { UpdatePrompt } from '@/components/UpdatePrompt';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { BackButton } from '@/components/BackButton';
 import { colors, font } from '@/theme';
+import { useLang } from '@/i18n';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -20,7 +21,7 @@ export default function RootLayout() {
   const { ready, user, boot } = useAuth();
   const segments = useSegments();
 
-  useEffect(() => { boot(); }, [boot]);
+  useEffect(() => { boot(); useLang.getState().init(); }, [boot]);
   useEffect(() => { if (fontsLoaded && ready) SplashScreen.hideAsync(); }, [fontsLoaded, ready]);
 
   // Browsing is open to everyone; sign-in is asked for at cart/checkout/orders.

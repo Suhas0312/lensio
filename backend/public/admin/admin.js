@@ -638,11 +638,12 @@
       <div class="card"><h2>Android app download</h2>
         ${releaseStatus(S.data.release)}
         <label>GitHub repo with your app releases (automatic updates)<input id="setRepo" placeholder="Suhas0312/lensio" value="${esc(s.androidReleaseRepo || '')}" style="max-width:280px"></label>
-        <p class="muted small">Publish a GitHub release (tag like <b>v2.0.2</b>, with the <b>.apk</b> attached, not a pre-release) and within 5 minutes the download page, the permanent link and the customers' update window switch to it. Nothing else to change here. Leave empty to use the GitHub repo from the link below. The fields below are only a fallback.</p>
-        <p class="muted small">Customers install the app from <a href="/download" target="_blank" rel="noopener">your download page</a>. Upload the APK to Cloudflare R2, then paste its public link here. When you release a new version, update both fields and the app tells customers to update.</p>
+        <p class="muted small">New versions are automatic: raise the version in mobile/app.json, upload to GitHub, and about 30 minutes later GitHub publishes the release; within 5 minutes the download page, the permanent link and the customers' update window switch to it. Nothing else to change here. Leave empty to use the GitHub repo from the link below. The fields below are only a fallback.</p>
+        <details><summary class="small">Backup settings (used only if GitHub can't be reached; kept up to date automatically)</summary>
         <label>APK download link<input id="setApk" placeholder="https://pub-….r2.dev/lensio-1.0.0.apk" value="${esc(s.androidApkUrl || '')}"></label>
         <label>Latest version<input id="setVer" placeholder="1.0.0" value="${esc(s.androidLatestVersion || '')}" style="max-width:160px"></label>
         <label>What's new (shown in the app's update window)<textarea id="setNotes" rows="3" maxlength="600" placeholder="e.g. Faster try-on, new frames, bug fixes.">${esc(s.androidUpdateNotes || '')}</textarea></label>
+        </details>
         <label>Minimum version (optional)<input id="setMinVer" placeholder="leave empty" value="${esc(s.androidMinVersion || '')}" style="max-width:160px"></label>
         <p class="small"><b>Share these links (they never change):</b><br>
           Download page: <a href="/download" target="_blank" rel="noopener">${esc(location.origin)}/download</a><br>
@@ -742,59 +743,80 @@
     const list = S.data.banners;
     if (!list) return shell('<p class="muted">Loading banners…</p>');
     const dt = (v) => (v ? new Date(v).toISOString().slice(0, 16) : '');
-    const card = (b, i) => `<div class="card" style="display:grid;gap:10px">
-      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start">
-        <div style="width:260px;max-width:100%;aspect-ratio:2.4;border-radius:14px;overflow:hidden;background:linear-gradient(120deg,#08B9DB,#7B61FF,#C94EF2);position:relative;flex:none">
-          ${b.videoDesktop ? `<video src="${esc(b.videoDesktop)}" ${b.imageDesktop ? `poster="${esc(b.imageDesktop)}"` : ''} autoplay muted loop playsinline style="width:100%;height:100%;object-fit:cover"></video>`
-            : b.imageDesktop ? `<img src="${esc(b.imageDesktop)}" alt="" style="width:100%;height:100%;object-fit:cover">` : ''}
-          ${b.textInImage ? '' : `<div style="position:absolute;left:12px;bottom:10px;right:12px;color:#fff;text-shadow:0 1px 6px rgba(0,0,0,.5)"><b>${esc(b.title || '')}</b><div class="small">${esc(b.text || '')}</div></div>`}
+    const hasD = (b) => !!(b.imageDesktop || b.videoDesktop), hasM = (b) => !!(b.imageMobile || b.videoMobile);
+    /** One device slot: picture or video preview + its buttons. */
+    const slot = (b, i, dev) => {
+      const D = dev === 'desktop', img = D ? b.imageDesktop : b.imageMobile, vid = D ? b.videoDesktop : b.videoMobile;
+      const kImg = D ? 'imageDesktop' : 'imageMobile', kVid = D ? 'videoDesktop' : 'videoMobile';
+      const box = `width:100%;aspect-ratio:${D ? '8/3' : '8/5'};border-radius:12px;overflow:hidden;position:relative;background:${img || vid ? '#000' : 'repeating-linear-gradient(45deg,#1b2160,#1b2160 10px,#151a4f 10px,#151a4f 20px)'}`;
+      return `<div style="display:grid;gap:6px;align-content:start">
+        <b class="small">${D ? '🖥 Desktop (computers)' : '📱 Mobile (app + phone website)'}</b>
+        <div style="${box}">
+          ${vid ? `<video src="${esc(vid)}" ${img ? `poster="${esc(img)}"` : ''} autoplay muted loop playsinline style="width:100%;height:100%;object-fit:cover"></video>`
+            : img ? `<img src="${esc(img)}" alt="" style="width:100%;height:100%;object-fit:cover">`
+            : `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#A3A8D2" class="small">No ${D ? 'desktop' : 'mobile'} picture: not shown on ${D ? 'computers' : 'phones'}</div>`}
+          ${!b.textInImage && (b.title || b.text) && (img || vid) ? `<div style="position:absolute;left:10px;bottom:8px;right:10px;color:#fff;text-shadow:0 1px 6px rgba(0,0,0,.6)"><b>${esc(b.title || '')}</b><div class="small">${esc(b.text || '')}</div></div>` : ''}
         </div>
-        <div style="flex:1;min-width:240px;display:grid;gap:8px">
-          <label class="check"><input type="checkbox" data-bf="${i}:textInImage" ${b.textInImage ? 'checked' : ''}> <span><b>This picture already has its own text</b>: don't write the headline and button on it (the whole banner still opens the link)</span></label>
-          <label>Headline <span class="small muted">(optional${b.textInImage ? ': only read out by screen readers' : ''})</span><input data-bf="${i}:title" value="${esc(b.title || '')}" maxlength="80"></label>
-          <label>Text <span class="small muted">(optional)</span><input data-bf="${i}:text" value="${esc(b.text || '')}" maxlength="200"></label>
-          <div style="display:flex;gap:8px;flex-wrap:wrap"><label style="flex:1">Button<input data-bf="${i}:cta" value="${esc(b.cta || '')}" placeholder="e.g. Shop now" maxlength="30"></label>
-          <label style="flex:2">Opens<input data-bf="${i}:link" value="${esc(b.link || '')}" placeholder="/shop?kind=sunglasses · /tryon · /product/vista-rectangle"></label></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn" data-act="banImg" data-i="${i}" data-k="${kImg}">${img ? 'Change' : 'Add'} image</button>
+          ${img ? `<button class="link" data-act="banVidDel" data-i="${i}" data-k="${kImg}" title="Remove image">✕</button>` : ''}
+          <button class="btn" data-act="banVid" data-i="${i}" data-k="${kVid}">🎬 ${vid ? 'Change' : 'Add'} video</button>
+          ${vid ? `<button class="link" data-act="banVidDel" data-i="${i}" data-k="${kVid}" title="Remove video">✕</button>` : ''}
         </div>
-      </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-        <button class="btn" data-act="banImg" data-i="${i}" data-k="imageDesktop">🖥 ${b.imageDesktop ? 'Change' : 'Add'} desktop image</button>
-        <button class="btn" data-act="banImg" data-i="${i}" data-k="imageMobile">📱 ${b.imageMobile ? 'Change' : 'Add'} mobile image</button>
-        ${b.imageMobile ? `<img src="${esc(b.imageMobile)}" alt="" style="height:40px;border-radius:6px">` : ''}
-        <label class="small" style="flex:1;min-width:200px">Picture description (for screen readers)<input data-bf="${i}:alt" value="${esc(b.alt || '')}" maxlength="160"></label>
-      </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-        <button class="btn" data-act="banVid" data-i="${i}" data-k="videoDesktop">🎬 ${b.videoDesktop ? 'Change' : 'Add'} desktop video</button>
-        ${b.videoDesktop ? `<button class="link" data-act="banVidDel" data-i="${i}" data-k="videoDesktop" title="Remove desktop video">✕</button>` : ''}
-        <button class="btn" data-act="banVid" data-i="${i}" data-k="videoMobile">🎬 ${b.videoMobile ? 'Change' : 'Add'} mobile video</button>
-        ${b.videoMobile ? `<video src="${esc(b.videoMobile)}" muted autoplay loop playsinline style="height:40px;border-radius:6px"></video><button class="link" data-act="banVidDel" data-i="${i}" data-k="videoMobile" title="Remove mobile video">✕</button>` : ''}
-        ${b.videoDesktop || b.videoMobile ? `<label class="check"><input type="checkbox" data-bf="${i}:sound" ${b.sound ? 'checked' : ''}> <span><b>Sound</b>: show a 🔊 button customers can tap (videos always start muted: browsers only allow sound after a tap)</span></label>` : ''}
-        <span class="small muted">Optional: a short MP4 (5–15 s, under 25 MB) plays on a loop instead of the image. Keep the images too: they show while the video loads.</span>
-      </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center" class="small">
+        <span class="small muted">${D ? '1600 × 600 (8:3)' : '900 × 560 (8:5)'} · images are shrunk automatically</span>
+      </div>`;
+    };
+    const card = (b, i) => {
+      const next = list[i + 1];
+      // Two half-banners next to each other (one desktop-only, one mobile-only) → offer to combine them.
+      const canCombine = next && ((hasD(b) && !hasM(b) && hasM(next) && !hasD(next)) || (hasM(b) && !hasD(b) && hasD(next) && !hasM(next)));
+      const sched = !!(b.startsAt || b.endsAt || b.schedOpen);
+      const warn = [];
+      if (hasD(b) && !hasM(b)) warn.push('Computers only: add a mobile picture to show it on phones too.');
+      if (hasM(b) && !hasD(b)) warn.push('Phones only: add a desktop picture to show it on computers too.');
+      if (b.startsAt && b.endsAt && new Date(b.endsAt) <= new Date(b.startsAt)) warn.push('“Until” is not later than “Show from”: this banner would never show.');
+      if (b.endsAt && new Date(b.endsAt) < new Date()) warn.push('“Until” is in the past: this banner has ended.');
+      return `<div class="card" style="display:grid;gap:12px">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><b>Banner ${i + 1}</b>
         <label class="check"><input type="checkbox" data-bf="${i}:visible" ${b.visible ? 'checked' : ''}> <span>Visible</span></label>
-        <label>Show from <span class="muted">(optional)</span> <input type="datetime-local" data-bf="${i}:startsAt" value="${dt(b.startsAt)}"></label>${b.startsAt ? `<button class="link" data-act="banClear" data-i="${i}" data-k="startsAt" title="Clear">✕</button>` : ''}
-        <label>Until <span class="muted">(optional)</span> <input type="datetime-local" data-bf="${i}:endsAt" value="${dt(b.endsAt)}"></label>${b.endsAt ? `<button class="link" data-act="banClear" data-i="${i}" data-k="endsAt" title="Clear">✕</button>` : ''}
         <span class="grow"></span>
         <button class="link" data-act="banMove" data-i="${i}" data-d="-1" ${i === 0 ? 'disabled' : ''}>↑ Up</button>
         <button class="link" data-act="banMove" data-i="${i}" data-d="1" ${i === list.length - 1 ? 'disabled' : ''}>↓ Down</button>
-        <button class="link" style="color:#f87171" data-act="banDel" data-i="${i}">🗑 Remove</button>
+        <button class="link" style="color:#f87171" data-act="banDel" data-i="${i}">🗑 Remove</button></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px">${slot(b, i, 'desktop')}${slot(b, i, 'mobile')}</div>
+      <label class="check"><input type="checkbox" data-bf="${i}:textInImage" ${b.textInImage ? 'checked' : ''}> <span><b>The pictures already have their own text</b> (don't write anything on them; the whole banner still opens the link)</span></label>
+      ${b.textInImage ? '' : `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px">
+        <label>Headline <span class="small muted">(optional)</span><input data-bf="${i}:title" value="${esc(b.title || '')}" maxlength="80"></label>
+        <label>Text <span class="small muted">(optional)</span><input data-bf="${i}:text" value="${esc(b.text || '')}" maxlength="200"></label>
+        <label>Button <span class="small muted">(optional)</span><input data-bf="${i}:cta" value="${esc(b.cta || '')}" placeholder="e.g. Shop now" maxlength="30"></label></div>`}
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px">
+        <label>Opens when tapped <span class="small muted">(optional)</span><input data-bf="${i}:link" value="${esc(b.link || '')}" placeholder="/shop · /shop?kind=sunglasses · /tryon"></label>
+        <label>Picture description <span class="small muted">(optional, for screen readers)</span><input data-bf="${i}:alt" value="${esc(b.alt || '')}" maxlength="160"></label></div>
+      <div style="border:1px solid #2a2f6b;border-radius:10px;padding:10px;display:grid;gap:8px">
+        <b class="small">🎵 Sound (optional)</b>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <button class="btn" data-act="banAudio" data-i="${i}">🎵 ${b.audio ? 'Change' : 'Add'} audio</button>
+          ${b.audio ? `<audio src="${esc(b.audio)}" controls preload="none" style="height:36px"></audio><button class="link" data-act="banVidDel" data-i="${i}" data-k="audio" title="Remove audio">✕</button>` : '<span class="small muted">Music or a voice-over (MP3/M4A, under 10 MB)</span>'}
+        </div>
+        ${b.audio || b.videoDesktop || b.videoMobile ? `<label class="check"><input type="checkbox" data-bf="${i}:sound" ${b.sound ? 'checked' : ''}> <span><b>Show the 🔊 sound button</b> on this banner. Customers tap it to hear ${b.audio ? 'the audio' : 'the video’s sound'} and tap again to mute. Everything starts muted: phones and browsers only allow sound after a tap.</span></label>` : '<span class="small muted">Add audio or a video to use sound.</span>'}
       </div>
-      ${(() => {
-        const warn = [];
-        if (!b.imageDesktop && !b.videoDesktop && (b.imageMobile || b.videoMobile)) warn.push('Phones only: no desktop picture, so computers don’t show this banner. To show it on both, add the desktop image to <b>this same banner</b>.');
-        if (!b.imageMobile && !b.videoMobile && (b.imageDesktop || b.videoDesktop)) warn.push('Computers only: no mobile picture, so phones (app and mobile website) don’t show this banner. To show it on both, add the mobile image to <b>this same banner</b>.');
-        if (!b.imageDesktop && !b.imageMobile && !b.videoDesktop && !b.videoMobile) warn.push('No picture yet: the banner shows your brand gradient.');
-        if (b.startsAt && b.endsAt && new Date(b.endsAt) <= new Date(b.startsAt)) warn.push('“Until” is not later than “Show from”: this banner would never show. Clear both to always show it.');
-        if (b.endsAt && new Date(b.endsAt) < new Date()) warn.push('“Until” is in the past: this banner has ended and is not shown.');
-        if (b.visible && !b.textInImage && !b.title && !b.text && b.cta) warn.push('Only a button and no headline: add a headline, or tick “already has its own text”.');
-        return warn.length ? `<div class="small" style="border:1px solid #f59e0b;border-radius:10px;padding:8px 10px;color:#fbbf24">${warn.map((w) => '⚠ ' + w).join('<br>')}</div>` : '';
-      })()}</div>`;
+      <div class="small" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <label class="check"><input type="checkbox" data-act="banSched" data-i="${i}" ${sched ? 'checked' : ''}> <span>Show only between dates</span></label>
+        ${sched ? `<label>From <input type="datetime-local" data-bf="${i}:startsAt" value="${dt(b.startsAt)}"></label>
+          <label>Until <input type="datetime-local" data-bf="${i}:endsAt" value="${dt(b.endsAt)}"></label>` : '<span class="muted">Always shown while Visible is ticked</span>'}
+      </div>
+      ${canCombine ? `<div style="border:1px solid #22d3ee;border-radius:10px;padding:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <span class="small">Banner ${i + 1} has only a ${hasD(b) ? 'desktop' : 'mobile'} picture and banner ${i + 2} only a ${hasD(b) ? 'mobile' : 'desktop'} one. They're probably the same banner.</span>
+        <button class="btn p" data-act="banCombine" data-i="${i}">🔗 Combine into one banner</button></div>` : ''}
+      ${warn.length ? `<div class="small" style="border:1px solid #f59e0b;border-radius:10px;padding:8px 10px;color:#fbbf24">${warn.map((w) => '⚠ ' + w).join('<br>')}</div>` : ''}
+      </div>`;
+    };
     return shell(`<div class="bar"><h1 class="grow">Home banners</h1><button class="btn" data-act="banAdd">+ Add banner</button><button class="btn p" data-act="banSave">Save banners</button></div>
-      <p class="small muted">Banners rotate at the top of Home in the app and website. Best sizes: desktop 1600 × 600, mobile 900 × 560 (images: JPG/PNG/WebP under 5 MB; videos: MP4 under 25 MB, same shapes). Banners slide automatically; video banners stay until the clip has played. Without an image, the banner shows your brand gradient with the headline. Only real offers, please: customers can see them.</p>
+      <p class="small muted">Banners rotate at the top of Home in the app and website. One banner = one desktop picture + one mobile picture (or video). Computers show the desktop one, phones the mobile one. Images are shrunk automatically when you upload them; videos: MP4 under 25 MB. Banners slide automatically; video banners stay until the clip has played. Without an image, the banner shows your brand gradient with the headline. Only real offers, please: customers can see them.</p>
       ${list.length ? list.map(card).join('') : '<div class="card"><p>No banners yet. Tap <b>+ Add banner</b>. Until you add some, Home shows its usual sections.</p></div>'}
       <input type="file" id="banFile" accept="image/jpeg,image/png,image/webp" hidden>
-      <input type="file" id="banVidFile" accept="video/mp4,video/webm" hidden>`);
+      <input type="file" id="banVidFile" accept="video/mp4,video/webm" hidden>
+      <input type="file" id="banAudioFile" accept="audio/mpeg,audio/mp4,audio/x-m4a,audio/aac,audio/ogg,.mp3,.m4a" hidden>`);
   }
 
   function render() {
@@ -828,6 +850,31 @@
       if (view === 'eyetest') S.data.eyetests = await api('/admin/eye-test');
     } catch (e) { toast(e.message); }
     if (S.view === view) render();
+  }
+
+  /**
+   * Shrinks a photo before upload so pages load fast: at most maxW pixels wide, JPEG quality 0.86.
+   * Small files and PNGs with see-through parts (try-on overlays) are left as they are.
+   */
+  async function shrinkImage(f, maxW) {
+    try {
+      if (!/^image\/(jpeg|png|webp)$/.test(f.type)) return f;
+      const bmp = await createImageBitmap(f);
+      if (bmp.width <= maxW && f.size <= 450 * 1024) return f;
+      const w = Math.min(maxW, bmp.width), h = Math.round(bmp.height * (w / bmp.width));
+      const c = document.createElement('canvas'); c.width = w; c.height = h;
+      const g = c.getContext('2d');
+      if (f.type === 'image/png') {   // keep transparency if the PNG has any
+        const t = document.createElement('canvas'); t.width = 64; t.height = Math.max(1, Math.round(64 * bmp.height / bmp.width));
+        const tg = t.getContext('2d'); tg.drawImage(bmp, 0, 0, t.width, t.height);
+        const d = tg.getImageData(0, 0, t.width, t.height).data;
+        for (let i = 3; i < d.length; i += 4) if (d[i] < 250) return f;
+      }
+      g.fillStyle = '#fff'; g.fillRect(0, 0, w, h); g.drawImage(bmp, 0, 0, w, h);
+      const blob = await new Promise((r) => c.toBlob(r, 'image/jpeg', 0.86));
+      if (!blob || blob.size >= f.size) return f;
+      return new File([blob], f.name.replace(/\.\w+$/, '') + '.jpg', { type: 'image/jpeg' });
+    } catch { return f; }
   }
 
   async function uploadFiles(files, kind) {
@@ -1041,16 +1088,29 @@
         const i = S.data.products.findIndex((x) => x.id === el.dataset.id); if (i >= 0) S.data.products[i] = up;
         S.stockOpen = null; toast('Stock saved'); return render();
       }
-      if (act === 'banAdd') { S.data.banners.push({ id: 'b' + Date.now().toString(36), title: 'New banner', text: '', cta: 'Shop now', link: '/shop', imageDesktop: null, imageMobile: null, alt: '', visible: false, startsAt: null, endsAt: null }); return render(); }
+      if (act === 'banAdd') { S.data.banners.push({ id: 'b' + Date.now().toString(36), title: '', text: '', cta: '', link: '/shop', imageDesktop: null, imageMobile: null, videoDesktop: null, videoMobile: null, alt: '', textInImage: false, sound: false, visible: true, startsAt: null, endsAt: null }); return render(); }
+      if (act === 'banCombine') {
+        const i = +el.dataset.i, a = S.data.banners[i], b = S.data.banners[i + 1];
+        for (const k of ['imageDesktop', 'imageMobile', 'videoDesktop', 'videoMobile']) a[k] = a[k] || b[k];
+        for (const k of ['title', 'text', 'cta', 'link', 'alt']) a[k] = a[k] || b[k];
+        a.textInImage = a.textInImage || b.textInImage; a.sound = a.sound || b.sound;
+        S.data.banners.splice(i + 1, 1); toast('Combined: one banner with both pictures. Tap Save banners.'); return render();
+      }
+      if (act === 'banSched') {
+        const b = S.data.banners[+el.dataset.i];
+        if (el.checked) b.schedOpen = true; else { b.schedOpen = false; b.startsAt = null; b.endsAt = null; }
+        return render();
+      }
       if (act === 'banDel') { if (!confirm('Remove this banner?')) return; S.data.banners.splice(+el.dataset.i, 1); return render(); }
       if (act === 'banMove') { const i = +el.dataset.i, j = i + +el.dataset.d, l = S.data.banners; [l[i], l[j]] = [l[j], l[i]]; return render(); }
       if (act === 'banVid') { S.banTarget = { i: +el.dataset.i, k: el.dataset.k }; return $('#banVidFile').click(); }
+      if (act === 'banAudio') { S.banTarget = { i: +el.dataset.i, k: 'audio' }; return $('#banAudioFile').click(); }
       if (act === 'banClear') { S.data.banners[+el.dataset.i][el.dataset.k] = null; return render(); }
-      if (act === 'banVidDel') { S.data.banners[+el.dataset.i][el.dataset.k] = null; toast('Video removed: tap Save banners'); return render(); }
+      if (act === 'banVidDel') { S.data.banners[+el.dataset.i][el.dataset.k] = null; toast('Removed: tap Save banners'); return render(); }
       if (act === 'banImg') { S.banTarget = { i: +el.dataset.i, k: el.dataset.k }; return $('#banFile').click(); }
       if (act === 'banSave') {
         el.disabled = true;
-        try { S.data.banners = await api('/admin/banners', { method: 'PUT', body: { banners: S.data.banners } }); toast('Banners saved: Home updates within a minute'); }
+        try { S.data.banners = await api('/admin/banners', { method: 'PUT', body: { banners: S.data.banners.map(({ schedOpen, ...b }) => b) } }); toast('Banners saved: Home updates within a minute'); }
         catch (e) { toast(e.message); }
         el.disabled = false; return render();
       }
@@ -1269,6 +1329,19 @@
         if (['visible', 'textInImage', 'sound', 'startsAt', 'endsAt'].includes(k)) render();
         return;
       }
+      if (t.id === 'banAudioFile') {
+        const f = t.files[0]; t.value = ''; if (!f || !S.banTarget) return;
+        const type = f.type || (/\.mp3$/i.test(f.name) ? 'audio/mpeg' : /\.m4a$/i.test(f.name) ? 'audio/mp4' : '');
+        if (!/^audio\/(mpeg|mp4|x-m4a|aac|ogg)$/.test(type)) return toast('Use an MP3, M4A, AAC or OGG file');
+        if (f.size > 10 * 1024 * 1024) return toast(`${f.name} is over 10 MB: export a shorter or smaller MP3`);
+        const fd = new FormData(); fd.append('file', new File([f], f.name, { type }));
+        try {
+          toast(`Uploading ${f.name}…`);
+          const { url } = await api('/admin/uploads/audio', { form: fd });
+          const b = S.data.banners[S.banTarget.i]; b.audio = url; b.sound = true;
+          toast('Audio added: tap Save banners'); return render();
+        } catch (e) { return toast(e.message); }
+      }
       if (t.id === 'banVidFile') {
         const f = t.files[0]; t.value = ''; if (!f || !S.banTarget) return;
         if (!/^video\/(mp4|webm)$/.test(f.type)) return toast('Use an MP4 or WebM video');
@@ -1282,7 +1355,9 @@
       }
       if (t.id === 'banFile') {
         const f = t.files[0]; t.value = ''; if (!f || !S.banTarget) return;
-        const [url] = await uploadFiles([f], 'banners'); if (!url) return;
+        const small = await shrinkImage(f, S.banTarget.k === 'imageMobile' ? 1200 : 2048);
+        if (small !== f) toast(`Shrunk ${Math.round(f.size / 1024)} KB → ${Math.round(small.size / 1024)} KB for fast loading`);
+        const [url] = await uploadFiles([small], 'banners'); if (!url) return;
         S.data.banners[S.banTarget.i][S.banTarget.k] = url; toast('Image added: tap Save banners'); return render();
       }
       if (t.dataset.ch !== undefined && S.imp) {

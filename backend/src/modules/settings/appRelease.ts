@@ -1,5 +1,5 @@
 import { logger } from '../../lib/logger';
-import { getSettings } from './settings.service';
+import { getSettings, saveSettings } from './settings.service';
 
 /**
  * The Android app release customers should get.
@@ -123,6 +123,11 @@ export async function androidRelease(): Promise<AndroidRelease> {
     // GitHub wins unless the admin typed a newer version by hand.
     if (admin.version && SEMVER.test(admin.version) && isNewer(admin.version, gh.version)) return { ...admin, repo };
     const sameAsAdmin = admin.version === gh.version;
+    // Keep the backup fields in step with GitHub, so if GitHub is ever unreachable customers still get the newest app
+    // (they used to stay on an old hand-typed version like 2.0.2).
+    if (!sameAsAdmin || admin.apkUrl !== gh.apkUrl) {
+      try { void Promise.resolve(saveSettings({ androidLatestVersion: gh.version, androidApkUrl: gh.apkUrl, ...(gh.notes ? { androidUpdateNotes: gh.notes } : {}) })).catch(() => {}); } catch { /* never affects customers */ }
+    }
     return { apkUrl: gh.apkUrl, version: gh.version, notes: gh.notes ?? (sameAsAdmin ? admin.notes : null) ?? admin.notes, minVersion: admin.minVersion, source: 'github', repo };
   } catch (e) {
     return { ...admin, repo, error: (e as Error).message };
