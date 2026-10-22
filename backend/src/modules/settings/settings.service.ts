@@ -19,6 +19,8 @@ export interface ShopSettings {
   autoStartLensWork: boolean;          // prescription verified → lens cutting & fitting straight away
   eyeTestEnabled: boolean;
   storesEnabled: boolean;              // "Find a store" shown to customers
+  bannerShapeDesktop: string;          // home banner shape on computers 'W:H': 8:3 (wide), 2:1, 16:9 (video) or any custom, e.g. 1920:1080
+  bannerShapeMobile: string;           // on phones: 8:5, 16:9 (video), 4:3, 1:1 or custom
   tryOn2d: boolean;                    // live 2D try-on (glasses drawn on the camera picture)
   tryOn3d: boolean;                    // 3D try-on view
   assistantEnabled: boolean;           // "Ask Lensio" chat
@@ -34,11 +36,19 @@ export interface ShopSettings {
 }
 
 const DEFAULTS: ShopSettings = { upiId: null, upiPayeeName: 'Lensio', upiQrImage: null, codEnabled: false, androidApkUrl: null, androidLatestVersion: null, androidMinVersion: null, androidUpdateNotes: null, androidReleaseRepo: null, shopInfo: null, instagramUrl: null,
-  ownerEmailAlerts: true, autoStartLensWork: true, autoApproveTypedRx: false, frameOnlyToQc: true, eyeTestEnabled: false, storesEnabled: true, tryOn2d: true, tryOn3d: true, assistantEnabled: true, alertEmails: '',
+  ownerEmailAlerts: true, autoStartLensWork: true, autoApproveTypedRx: false, frameOnlyToQc: true, eyeTestEnabled: false, storesEnabled: true, bannerShapeDesktop: '8:3', bannerShapeMobile: '8:5', tryOn2d: true, tryOn3d: true, assistantEnabled: true, alertEmails: '',
   loyaltyEnabled: true, loyaltyPointsPer100: 5, loyaltyMaxRedeemPercent: 20, reviewsAutoApprove: true };
 
 let cache: { at: number; v: ShopSettings } | null = null;
 const bool = (v: string | undefined, d: boolean) => (v === undefined || v === '' ? d : v === 'true');
+
+/** A banner shape 'W:H' (ready-made like 16:9, or custom like 1920:1080): width ÷ height between 0.5 (tall) and 4 (very wide). */
+export function validShape(v: unknown): v is string {
+  const m = typeof v === 'string' ? /^(\d{1,5}):(\d{1,5})$/.exec(v.trim()) : null;
+  if (!m || +m[2] === 0) return false;
+  const r = +m[1] / +m[2];
+  return r >= 0.5 && r <= 4;
+}
 
 export async function getSettings(): Promise<ShopSettings> {
   if (cache && Date.now() - cache.at < 30_000) return cache.v;
@@ -61,6 +71,8 @@ export async function getSettings(): Promise<ShopSettings> {
     autoApproveTypedRx: bool(m.autoApproveTypedRx, DEFAULTS.autoApproveTypedRx),
     eyeTestEnabled: bool(m.eyeTestEnabled, DEFAULTS.eyeTestEnabled),
     storesEnabled: bool(m.storesEnabled, DEFAULTS.storesEnabled),
+    bannerShapeDesktop: validShape(m.bannerShapeDesktop) ? m.bannerShapeDesktop : DEFAULTS.bannerShapeDesktop,
+    bannerShapeMobile: validShape(m.bannerShapeMobile) ? m.bannerShapeMobile : DEFAULTS.bannerShapeMobile,
     tryOn2d: bool(m.tryOn2d, DEFAULTS.tryOn2d),
     tryOn3d: bool(m.tryOn3d, DEFAULTS.tryOn3d),
     assistantEnabled: bool(m.assistantEnabled, DEFAULTS.assistantEnabled),

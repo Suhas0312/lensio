@@ -16,7 +16,7 @@ import { testGeminiKeys } from '../assistant/assistant.service';
 import { alertRecipients } from '../notifications/owner.service';
 import { importCatalog, Kind, TEMPLATES } from '../catalogImport/import.service';
 import { bannerSchema, getBanners, saveBanners } from '../banners/banners';
-import { getSettings, saveSettings } from '../settings/settings.service';
+import { validShape, getSettings, saveSettings } from '../settings/settings.service';
 import { mailEnabled, sendMail } from '../../lib/mail';
 import { notifyEyeTest, notifyOrderUpdate } from '../notifications/whatsapp.service';
 import { shiprocketEnabled } from '../shipping/shiprocket.service';
@@ -525,6 +525,8 @@ r.put('/settings', adminOnly, validate(z.object({
   instagramUrl: z.string().trim().url('Paste your full Instagram link').nullable().optional().or(z.literal('').transform(() => null)),
   ownerEmailAlerts: z.boolean().optional(), autoStartLensWork: z.boolean().optional(),
   autoApproveTypedRx: z.boolean().optional(), frameOnlyToQc: z.boolean().optional(), eyeTestEnabled: z.boolean().optional(), storesEnabled: z.boolean().optional(),
+  bannerShapeDesktop: z.string().trim().refine(validShape, 'Banner shape: width:height between 1:2 and 4:1, e.g. 16:9 or 1920:1080').optional(),
+  bannerShapeMobile: z.string().trim().refine(validShape, 'Banner shape: width:height between 1:2 and 4:1, e.g. 16:9 or 1080:1080').optional(),
   tryOn2d: z.boolean().optional(), tryOn3d: z.boolean().optional(), assistantEnabled: z.boolean().optional(),
   alertEmails: z.string().trim().max(500).refine((v) => !v || v.split(',').map((e) => e.trim()).filter(Boolean).every((e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)), 'Enter email addresses separated by commas').optional(),
   androidLatestVersion: z.string().trim().regex(/^\d+\.\d+\.\d+$/, 'Version looks like 1.0.1').nullable().optional().or(z.literal('').transform(() => null)),

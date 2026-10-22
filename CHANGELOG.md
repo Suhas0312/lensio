@@ -10,6 +10,7 @@ Server versions are shown in `/v1/config` and the admin header. App versions are
 - **Ask Lensio greetings:** understands “Hlo”, “helo”, “hii”, “hai”, “heyy”, “Namaskara”, “good morning” and similar.
 
 ## 3.9.0 · One video (or picture) for both phone and computer
+- **Banner shape** (Admin → Banners, top): computers Wide 8:3 / Medium 2:1 / **Video 16:9** / **Custom**; phones Standard 8:5 / **Video 16:9** / Tall 4:3 / Square 1:1 / **Custom**. Custom = width : height as a ratio (21 : 9) or pixels (1920 : 1080). **🎯 Match my video** reads the banner video's real size and uses it, so it fits exactly (no blurred edges, nothing cut). Saves straight away; applies to all banners. On big screens a banner is never taller than 70% of the screen.
 - **Any size works:** Admin → Banners → 🎬 **One video for both** / 🖼 **One picture for both**: one upload is used on computers and phones and fitted automatically. No need to make exact banner sizes.
 - **Fit:** “Fill the banner” (edges trimmed; keep the middle, top or bottom) or “Show the whole video/picture” (nothing cut; a soft blurred copy fills the space, no black bars). Previews show exactly how it looks on a computer and a phone.
 - Works on the website (built-in player) and in the Android app.

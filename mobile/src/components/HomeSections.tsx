@@ -8,6 +8,7 @@ import { API_URL, cachedApi } from '@/api/client';
 import { Row, Text } from '@/components/UI';
 import { inr } from '@/lib/format';
 import { useRecent } from '@/lib/recent';
+import { useFeatures } from '@/lib/features';
 import { colors, gradient, radius, space } from '@/theme';
 import { useT } from '@/i18n';
 
@@ -110,7 +111,7 @@ export function HomeBanners({ width }: { width: number }) {
   const [all, setList] = useState<Banner[]>([]);
   const [i, setI] = useState(0);
   const ref = useRef<ScrollView>(null);
-  const { width: screen } = useWindowDimensions();
+  const { width: screen, height: screenH } = useWindowDimensions();
   const wide = screen >= 700;
   // Each device shows only its own banners (no doubles): phones need a mobile picture/video, computers a desktop one.
   // A banner without any picture (text on the brand colours) shows on both.
@@ -134,8 +135,10 @@ export function HomeBanners({ width }: { width: number }) {
     return () => clearTimeout(t);
   }, [list, i, width, pausedAt, soundOn]);
   useEffect(() => { setSoundOn(false); }, [i]);   // sound never carries over to the next banner
+  const shapes = useFeatures();   // banner shape chosen in admin → Banners (e.g. 16:9 fits normal videos exactly); before any early return
   if (!list.length || width <= 0) return null;
-  const h = wide ? Math.round(width / 2.67) : Math.round(width * 0.62);
+  // Chosen shape, but never taller than 70% of the screen (a 16:9 banner on a big monitor would hide the page).
+  const h = Math.round(Math.min(width / (wide ? shapes.bannerDesktop : shapes.bannerMobile), Math.max(240, screenH * 0.7)));
   // Only a real swipe pauses the automatic change (the carousel's own movement used to count as a swipe → uneven timing).
   const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     if (Date.now() < autoUntil.current) return;

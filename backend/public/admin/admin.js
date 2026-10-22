@@ -744,11 +744,33 @@
     if (!list) return shell('<p class="muted">Loading banners…</p>');
     const dt = (v) => (v ? new Date(v).toISOString().slice(0, 16) : '');
     const hasD = (b) => !!(b.imageDesktop || b.videoDesktop), hasM = (b) => !!(b.imageMobile || b.videoMobile);
+    const shapeD = (S.data.settings && S.data.settings.bannerShapeDesktop) || '8:3', shapeM = (S.data.settings && S.data.settings.bannerShapeMobile) || '8:5';
+    const PRESET_D = [['8:3', 'Wide 8:3'], ['2:1', 'Medium 2:1'], ['16:9', 'Video 16:9']];
+    const PRESET_M = [['8:5', 'Standard 8:5'], ['16:9', 'Video 16:9'], ['4:3', 'Tall 4:3'], ['1:1', 'Square 1:1']];
+    S.banCustom = S.banCustom || {};
+    /** One device's shape: ready-made choices, or Custom (width : height — a ratio like 21:9 or pixels like 1920 × 1080). */
+    const shapeCtl = (dev, cur, presets) => {
+      const custom = S.banCustom[dev] || !presets.some(([v]) => v === cur);
+      const [cw, ch] = cur.split(':');
+      return `<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        <label>${dev === 'D' ? '🖥 Computers' : '📱 Phones'} <select data-shape="${dev}">${presets.map(([v, l]) => `<option value="${v}" ${!custom && cur === v ? 'selected' : ''}>${l}</option>`).join('')}<option value="custom" ${custom ? 'selected' : ''}>Custom…</option></select></label>
+        ${custom ? `<input id="shapeW${dev}" type="number" min="1" max="99999" value="${esc(cw)}" style="max-width:90px" aria-label="width"> <b>:</b>
+          <input id="shapeH${dev}" type="number" min="1" max="99999" value="${esc(ch)}" style="max-width:90px" aria-label="height">
+          <button class="btn" data-act="shapeUse" data-dev="${dev}">Use</button>` : ''}
+        <button class="link" data-act="shapeMatch" data-dev="${dev}" title="Use the exact shape of this device's banner video">🎯 Match my video</button>
+      </div>`;
+    };
+    const shapeBar = `<div class="card" style="display:grid;gap:10px">
+      <b>Banner shape</b>
+      ${shapeCtl('D', shapeD, PRESET_D)}
+      ${shapeCtl('M', shapeM, PRESET_M)}
+      <span class="small muted">For normal videos (phone held sideways, YouTube, Canva…) choose <b>Video 16:9</b>, or tap <b>🎯 Match my video</b> to use your video's exact shape: it then fits exactly, nothing cut and no blurred edges. <b>Custom</b>: type width : height as a ratio (21 : 9) or in pixels (1920 : 1080). Applies to all banners and saves straight away.</span></div>`;
     /** One device slot: picture or video preview + its buttons. */
     const slot = (b, i, dev) => {
       const D = dev === 'desktop', img = D ? b.imageDesktop : b.imageMobile, vid = D ? b.videoDesktop : b.videoMobile;
       const kImg = D ? 'imageDesktop' : 'imageMobile', kVid = D ? 'videoDesktop' : 'videoMobile';
-      const box = `width:100%;aspect-ratio:${D ? '8/3' : '8/5'};border-radius:12px;overflow:hidden;position:relative;background:${img || vid ? '#000' : 'repeating-linear-gradient(45deg,#1b2160,#1b2160 10px,#151a4f 10px,#151a4f 20px)'}`;
+      const shp = D ? shapeD : shapeM;
+      const box = `width:100%;aspect-ratio:${shp.replace(':', '/')};border-radius:12px;overflow:hidden;position:relative;background:${img || vid ? '#000' : 'repeating-linear-gradient(45deg,#1b2160,#1b2160 10px,#151a4f 10px,#151a4f 20px)'}`;
       return `<div style="display:grid;gap:6px;align-content:start">
         <b class="small">${D ? '🖥 Desktop (computers)' : '📱 Mobile (app + phone website)'}</b>
         <div style="${box}">
@@ -768,7 +790,7 @@
           <button class="btn" data-act="banVid" data-i="${i}" data-k="${kVid}">🎬 ${vid ? 'Change' : 'Add'} video</button>
           ${vid ? `<button class="link" data-act="banVidDel" data-i="${i}" data-k="${kVid}" title="Remove video">✕</button>` : ''}
         </div>
-        <span class="small muted">${D ? '1600 × 600 (8:3)' : '900 × 560 (8:5)'} · images are shrunk automatically</span>
+        <span class="small muted">${D ? 'Computers' : 'Phones'}: ${shp}${shp === '16:9' ? ' (normal video shape)' : ''} · any size works, images are shrunk automatically</span>
       </div>`;
     };
     const card = (b, i) => {
@@ -832,6 +854,7 @@
       </div>`;
     };
     return shell(`<div class="bar"><h1 class="grow">Home banners</h1><button class="btn" data-act="banAdd">+ Add banner</button><button class="btn p" data-act="banSave">Save banners</button></div>
+      ${shapeBar}
       <p class="small muted">Banners rotate at the top of Home in the app and website. One banner = one desktop picture + one mobile picture (or video). Computers show the desktop one, phones the mobile one. Images are shrunk automatically when you upload them; videos: MP4 under 25 MB. Banners slide automatically; video banners stay until the clip has played. Without an image, the banner shows your brand gradient with the headline. Only real offers, please: customers can see them.</p>
       ${list.length ? list.map(card).join('') : '<div class="card"><p>No banners yet. Tap <b>+ Add banner</b>. Until you add some, Home shows its usual sections.</p></div>'}
       <input type="file" id="banFile" accept="image/jpeg,image/png,image/webp" hidden>
@@ -866,7 +889,7 @@
       if (view === 'reviews') { S.data.settings = S.data.settings || await api('/admin/settings'); S.data.reviews = await api('/admin/reviews?status=' + (S.data.reviewFilter || 'PENDING')); }
       if (view === 'rewards') { S.data.settings = S.data.settings || await api('/admin/settings'); S.data.giftcards = await api('/admin/giftcards'); }
       if (view === 'stores') S.data.stores = await api('/admin/stores');
-      if (view === 'banners') S.data.banners = await api('/admin/banners');
+      if (view === 'banners') { S.data.banners = await api('/admin/banners'); S.data.settings = S.data.settings || await api('/admin/settings').catch(() => null); }
       if (view === 'eyetest') S.data.eyetests = await api('/admin/eye-test');
     } catch (e) { toast(e.message); }
     if (S.view === view) render();
@@ -921,6 +944,14 @@
     ['dragenter', 'dragover'].forEach((ev) => d.addEventListener(ev, (e) => { e.preventDefault(); d.classList.add('over'); }));
     ['dragleave', 'drop'].forEach((ev) => d.addEventListener(ev, (e) => { e.preventDefault(); d.classList.remove('over'); }));
     d.addEventListener('drop', async (e) => { const urls = await uploadFiles([...e.dataTransfer.files], 'products'); S.edit.images.push(...urls); render(); if (urls.length) toast('Photos added. Save to publish them.'); });
+  }
+
+  const PRESET_SHAPES = { D: ['8:3', '2:1', '16:9'], M: ['8:5', '16:9', '4:3', '1:1'] };
+  async function saveShape(dev, value) {
+    const body = dev === 'D' ? { bannerShapeDesktop: value } : { bannerShapeMobile: value };
+    try { S.data.settings = await api('/admin/settings', { method: 'PUT', body }); toast(`Banner shape on ${dev === 'D' ? 'computers' : 'phones'}: ${value.replace(':', ' : ')}. Customers see it straight away.`); }
+    catch (e) { toast(e.message); }
+    return render();
   }
 
   /** Small dialog with several choices (e.g. Replace / Keep both / Skip). Resolves with the chosen value. */
@@ -1124,6 +1155,27 @@
       if (act === 'banDel') { if (!confirm('Remove this banner?')) return; S.data.banners.splice(+el.dataset.i, 1); return render(); }
       if (act === 'banMove') { const i = +el.dataset.i, j = i + +el.dataset.d, l = S.data.banners; [l[i], l[j]] = [l[j], l[i]]; return render(); }
       if (act === 'banVid') { S.banTarget = { i: +el.dataset.i, k: el.dataset.k }; return $('#banVidFile').click(); }
+      if (act === 'shapeUse') {
+        const dev = el.dataset.dev, w = Math.round(+$('#shapeW' + dev).value), h = Math.round(+$('#shapeH' + dev).value);
+        if (!(w > 0 && h > 0)) return toast('Type the width and the height, e.g. 16 : 9 or 1920 : 1080');
+        const r = w / h; if (r < 0.5 || r > 4) return toast('That shape is too tall or too wide: width ÷ height must be between 0.5 and 4');
+        return saveShape(dev, `${w}:${h}`);
+      }
+      if (act === 'shapeMatch') {
+        const dev = el.dataset.dev, k = dev === 'D' ? 'videoDesktop' : 'videoMobile';
+        const src = (S.data.banners.find((b) => b.visible !== false && b[k]) || S.data.banners.find((b) => b.videoDesktop || b.videoMobile) || {})[k]
+          || (S.data.banners.find((b) => b.videoDesktop || b.videoMobile) || {}).videoDesktop || (S.data.banners.find((b) => b.videoMobile) || {}).videoMobile;
+        if (!src) return toast('Add a banner video first, then tap 🎯 Match my video');
+        toast('Reading your video size…');
+        const size = await new Promise((res) => { const v = document.createElement('video'); v.preload = 'metadata'; v.muted = true;
+          v.onloadedmetadata = () => res(v.videoWidth && v.videoHeight ? [v.videoWidth, v.videoHeight] : null); v.onerror = () => res(null);
+          setTimeout(() => res(null), 10000); v.src = src; });
+        if (!size) return toast('Couldn’t read the video size here: choose Custom and type it (e.g. 1920 : 1080)');
+        const [w, h] = size, r = w / h;
+        if (r < 0.5 || r > 4) return toast(`Your video is ${w} × ${h}: too tall/wide for a banner. Use “Show the whole video” instead.`);
+        S.banCustom[dev] = !(PRESET_SHAPES[dev] || []).includes(`${w}:${h}`);
+        return saveShape(dev, `${w}:${h}`);
+      }
       if (act === 'banFit') { S.data.banners[+el.dataset.i].fit = el.dataset.v; return render(); }
       if (act === 'banAudio') { S.banTarget = { i: +el.dataset.i, k: 'audio' }; return $('#banAudioFile').click(); }
       if (act === 'banClear') { S.data.banners[+el.dataset.i][el.dataset.k] = null; return render(); }
@@ -1349,6 +1401,12 @@
         b[k] = t.type === 'checkbox' ? t.checked : t.type === 'datetime-local' ? (t.value ? new Date(t.value).toISOString() : null) : t.value;
         if (['visible', 'textInImage', 'sound', 'startsAt', 'endsAt', 'focus'].includes(k)) render();
         return;
+      }
+      if (t.dataset.shape) {
+        const dev = t.dataset.shape;
+        if (t.value === 'custom') { S.banCustom[dev] = true; return render(); }
+        S.banCustom[dev] = false;
+        return saveShape(dev, t.value);
       }
       if (t.id === 'banAudioFile') {
         const f = t.files[0]; t.value = ''; if (!f || !S.banTarget) return;
