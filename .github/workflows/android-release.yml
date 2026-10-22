@@ -1,8 +1,10 @@
+# Lensio release robot, version 2026-10-22 (builds the APK on GitHub; Expo's servers as automatic backup).
 # Android release, only when YOU raise the version.
 # A release is built when "version" in mobile/app.json is higher than the newest release (e.g. 3.3.0 → 3.4.0).
 # Small fixes uploaded without changing the version do NOT create a new app version.
 # Manual run (Actions tab → Run workflow) can force a release; it then uses the next patch number.
-#   1. builds the APK on Expo, 2. publishes a GitHub release with lensio.apk.
+#   1. builds the APK on GitHub's own machine (free, unlimited for public repos); if that fails it automatically tries
+#      Expo's servers (limited free builds per month), 2. publishes a GitHub release with lensio.apk.
 # Lensio's server checks this repo's newest release every few minutes, so /download, /download/lensio.apk
 # and the in-app "Update available" window switch to it automatically. No admin step needed.
 #
@@ -13,7 +15,7 @@ name: Android app release
 on:
   push:
     branches: [main]
-    paths: ['mobile/**']
+    paths: ['mobile/**', '.github/workflows/android-release.yml']   # uploading this file starts a fresh run
   workflow_dispatch:
     inputs:
       notes:
@@ -37,7 +39,7 @@ concurrency:
 
 jobs:
   release:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04          # fixed ("latest" moves to Ubuntu 26 from 19 Oct 2026)
     timeout-minutes: 150
     defaults:
       run:
@@ -46,11 +48,15 @@ jobs:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
       EAS_NO_VCS: '1'
     steps:
-      - uses: actions/checkout@v4
+      - name: Robot version
+        working-directory: .
+        run: echo "Lensio release robot, version 2026-10-22 (builds on GitHub; Expo as backup). Run ${{ github.run_number }}, attempt ${{ github.run_attempt }}."
+
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 20
           cache: npm
@@ -108,7 +114,7 @@ jobs:
       # free-build limit no longer stops releases. Expo is only asked for the app's signing key and version number.
       - name: Set up Java 17 (Android builds)
         if: steps.gate.outputs.release == 'yes' && github.event.inputs.expo_cloud != 'true'
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
@@ -135,6 +141,8 @@ jobs:
           ls "$SDK"/platforms 2>/dev/null | tail -3 || true
 
       - name: Build the APK on GitHub (15-30 minutes)
+        id: local
+        continue-on-error: true            # if it fails, the next step tries Expo's servers
         if: steps.gate.outputs.release == 'yes' && github.event.inputs.expo_cloud != 'true'
         env:
           GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx4g -Dorg.gradle.daemon=false
@@ -142,12 +150,13 @@ jobs:
           npx --yes eas-cli@16 build -p android --profile preview --local --non-interactive --output ./lensio.apk
           ls -la lensio.apk
 
-      - name: Build the APK on Expo's servers (only when chosen, 10-40 minutes)
-        if: steps.gate.outputs.release == 'yes' && github.event.inputs.expo_cloud == 'true'
+      - name: Build the APK on Expo's servers (chosen, or backup if the GitHub build failed)
+        id: cloud
+        if: steps.gate.outputs.release == 'yes' && (github.event.inputs.expo_cloud == 'true' || steps.local.outcome == 'failure')
         run: npx --yes eas-cli@16 build -p android --profile preview --non-interactive --wait --json > build.json
 
       - name: Download the APK (Expo build only)
-        if: steps.gate.outputs.release == 'yes' && github.event.inputs.expo_cloud == 'true'
+        if: steps.gate.outputs.release == 'yes' && steps.cloud.outcome == 'success'
         run: |
           url=$(node -e "const b=JSON.parse(require('fs').readFileSync('build.json','utf8'));const x=Array.isArray(b)?b[0]:b;process.stdout.write((x&&x.artifacts&&(x.artifacts.applicationArchiveUrl||x.artifacts.buildUrl))||'')")
           if [ -z "$url" ]; then echo "::error::Expo did not return an APK link"; cat build.json; exit 1; fi
@@ -161,6 +170,11 @@ jobs:
           VERSION: ${{ steps.ver.outputs.version }}
           NOTES: ${{ steps.notes.outputs.text }}
         run: |
+          if [ ! -s lensio.apk ] || [ "$(stat -c%s lensio.apk)" -lt 1000000 ]; then
+            echo "::error::No app file was built, so nothing was published. Open the build steps above (GitHub, then Expo backup) and send Claude a screenshot of the last red lines."
+            exit 1
+          fi
+          echo "App file: $(( $(stat -c%s lensio.apk) / 1024 / 1024 )) MB"
           gh release create "v$VERSION" lensio.apk --title "Lensio $VERSION" --notes "$NOTES" --latest
           echo "### Released Lensio $VERSION" >> "$GITHUB_STEP_SUMMARY"
           echo "Download: https://github.com/${{ github.repository }}/releases/download/v$VERSION/lensio.apk" >> "$GITHUB_STEP_SUMMARY"
