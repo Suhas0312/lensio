@@ -5,10 +5,15 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, gradient, radius, space, type } from '@/theme';
 import { webColumn } from '@/lib/layout';
+import { autoChildren, autoTr, useAutoDict, useLang } from '@/i18n';
 
 type Variant = keyof typeof type;
-export function Text({ v = 'body', color = colors.text, style, ...p }: TextProps & { v?: Variant; color?: string }) {
-  return <RNText {...p} style={[type[v], { color }, style]} />;
+/** All app text. It switches to the chosen language automatically (see src/i18n/auto.ts).
+ *  `raw` keeps the text exactly as it is: use it for a customer's own words (chat messages, names they typed). */
+export function Text({ v = 'body', color = colors.text, style, children, raw, ...p }: TextProps & { v?: Variant; color?: string; raw?: boolean }) {
+  const lang = useLang((st) => st.lang);
+  useAutoDict((st) => st.v);   // redraw when new translations arrive
+  return <RNText {...p} style={[type[v], { color }, style]}>{raw ? children : autoChildren(lang, children)}</RNText>;
 }
 
 export function Screen({ children, scroll = true, padded = true, footer }: { children: ReactNode; scroll?: boolean; padded?: boolean; footer?: ReactNode }) {
@@ -40,10 +45,12 @@ export function Button({ title, onPress, kind = 'primary', loading, disabled, st
 }
 
 export function Field({ label, error, hint, ...p }: TextInputProps & { label: string; error?: string; hint?: string }) {
+  const lang = useLang((st) => st.lang);
+  useAutoDict((st) => st.v);
   return (
     <View style={{ gap: space(1.5) }}>
       <Text v="caption" color={colors.muted}>{label}</Text>
-      <TextInput placeholderTextColor={colors.faint} {...p}
+      <TextInput placeholderTextColor={colors.faint} {...p} placeholder={p.placeholder ? autoTr(lang, p.placeholder) : p.placeholder}
         style={[s.input, error ? { borderColor: colors.danger } : null, p.style]} />
       {error ? <Text v="caption" color={colors.danger}>{error}</Text> : hint ? <Text v="caption" color={colors.faint}>{hint}</Text> : null}
     </View>

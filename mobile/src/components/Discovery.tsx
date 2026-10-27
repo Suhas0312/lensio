@@ -5,20 +5,20 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, radius, space } from '@/theme';
 import { useFeatures } from '@/lib/features';
 import { Text } from './UI';
-import { useT } from '@/i18n';
+import { Key, useT } from '@/i18n';
 
 const glass = { borderRadius: radius.md, borderWidth: 1, borderColor: 'rgba(160,170,255,0.16)', backgroundColor: 'rgba(21,27,77,0.62)' } as const;
 type Params = Record<string, string>;
 
 /** Shop by occasion: each tile opens the shop with filters that fit the occasion (based on real frame details). */
-const OCCASIONS: { icon: keyof typeof Ionicons.glyphMap; title: string; sub: string; params: Params }[] = [
-  { icon: 'desktop-outline', title: 'Office & screens', sub: 'Clean rectangles', params: { kind: 'eyeglasses', shape: 'RECTANGLE' } },
-  { icon: 'car-outline', title: 'Driving', sub: 'Aviator sunglasses', params: { kind: 'sunglasses', shape: 'AVIATOR' } },
-  { icon: 'sunny-outline', title: 'Beach & travel', sub: 'Wayfarer shades', params: { kind: 'sunglasses', shape: 'WAYFARER' } },
-  { icon: 'sparkles-outline', title: 'Party & statement', sub: 'Cat-eye frames', params: { shape: 'CAT_EYE' } },
-  { icon: 'bicycle-outline', title: 'Sports & active', sub: 'Light, bendable TR90', params: { material: 'TR90' } },
-  { icon: 'book-outline', title: 'Reading', sub: 'Classic round', params: { kind: 'eyeglasses', shape: 'ROUND' } },
-  { icon: 'school-outline', title: 'Kids & school', sub: 'Tough kids frames', params: { gender: 'KIDS' } },
+const OCCASIONS: { icon: keyof typeof Ionicons.glyphMap; title: Key; sub: Key; params: Params }[] = [
+  { icon: 'desktop-outline', title: 'occOffice', sub: 'occOfficeSub', params: { kind: 'eyeglasses', shape: 'RECTANGLE' } },
+  { icon: 'car-outline', title: 'occDriving', sub: 'occDrivingSub', params: { kind: 'sunglasses', shape: 'AVIATOR' } },
+  { icon: 'sunny-outline', title: 'occBeach', sub: 'occBeachSub', params: { kind: 'sunglasses', shape: 'WAYFARER' } },
+  { icon: 'sparkles-outline', title: 'occParty', sub: 'occPartySub', params: { shape: 'CAT_EYE' } },
+  { icon: 'bicycle-outline', title: 'occSports', sub: 'occSportsSub', params: { material: 'TR90' } },
+  { icon: 'book-outline', title: 'occReading', sub: 'occReadingSub', params: { kind: 'eyeglasses', shape: 'ROUND' } },
+  { icon: 'school-outline', title: 'occKids', sub: 'occKidsSub', params: { gender: 'KIDS' } },
 ];
 
 export function ShopByOccasion() {
@@ -28,11 +28,11 @@ export function ShopByOccasion() {
       <Text v="heading">{t('shopByOccasion')}</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space(3) }}>
         {OCCASIONS.map((o) => (
-          <Pressable key={o.title} onPress={() => router.push({ pathname: '/shop', params: o.params })} accessibilityRole="button" accessibilityLabel={`${o.title}: ${o.sub}`}
+          <Pressable key={o.title} onPress={() => router.push({ pathname: '/shop', params: o.params })} accessibilityRole="button" accessibilityLabel={`${t(o.title)}: ${t(o.sub)}`}
             style={({ pressed }) => [glass, { width: 150, padding: space(3), gap: space(1), transform: [{ scale: pressed ? 0.96 : 1 }] }]}>
             <Ionicons name={o.icon} size={24} color={colors.cyan} />
-            <Text v="bodyStrong">{o.title}</Text>
-            <Text v="caption" color={colors.muted}>{o.sub}</Text>
+            <Text v="bodyStrong">{t(o.title)}</Text>
+            <Text v="caption" color={colors.muted}>{t(o.sub)}</Text>
           </Pressable>
         ))}
       </ScrollView>
@@ -41,10 +41,11 @@ export function ShopByOccasion() {
 }
 
 /** Category bar for computers and tablets (wide screens): main collections, a shapes menu and quick links. */
-const LINKS: [string, Params][] = [['Eyeglasses', { kind: 'eyeglasses' }], ['Sunglasses', { kind: 'sunglasses' }], ['Men', { gender: 'MEN' }], ['Women', { gender: 'WOMEN' }], ['Kids', { gender: 'KIDS' }], ['New arrivals', { sort: 'new' }]];
-const SHAPES: [string, string][] = [['RECTANGLE', 'Rectangle'], ['ROUND', 'Round'], ['CAT_EYE', 'Cat-eye'], ['AVIATOR', 'Aviator'], ['WAYFARER', 'Wayfarer'], ['SQUARE', 'Square'], ['OVAL', 'Oval'], ['GEOMETRIC', 'Geometric']];
+const LINKS: [Key, Params][] = [['eyeglasses', { kind: 'eyeglasses' }], ['sunglasses', { kind: 'sunglasses' }], ['men', { gender: 'MEN' }], ['women', { gender: 'WOMEN' }], ['kids', { gender: 'KIDS' }], ['newArrivals', { sort: 'new' }]];
+const SHAPES: [string, Key][] = [['RECTANGLE', 'shapeRectangle'], ['ROUND', 'shapeRound'], ['CAT_EYE', 'shapeCatEye'], ['AVIATOR', 'shapeAviator'], ['WAYFARER', 'shapeWayfarer'], ['SQUARE', 'shapeSquare'], ['OVAL', 'shapeOval'], ['GEOMETRIC', 'shapeGeometric']];
 
 export function DesktopNav() {
+  const t = useT();
   const { width } = useWindowDimensions();
   const [shapesOpen, setShapesOpen] = useState(false);
   const { stores } = useFeatures();
@@ -58,24 +59,24 @@ export function DesktopNav() {
   );
   return (
     <View style={[glass, { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: space(1), paddingHorizontal: space(2), paddingVertical: space(1), zIndex: 20, ...(Platform.OS === 'web' ? ({ position: 'sticky', top: 0 } as object) : {}) }]} accessibilityRole="menubar">
-      {LINKS.map(([l, p]) => link(l, () => shop(p)))}
+      {LINKS.map(([l, p]) => link(t(l), () => shop(p)))}
       <View style={{ position: 'relative', zIndex: 30 }}>
-        {link(`Shapes ${shapesOpen ? '▴' : '▾'}`, () => setShapesOpen((o) => !o))}
+        {link(`${t('shapes')} ${shapesOpen ? '▴' : '▾'}`, () => setShapesOpen((o) => !o))}
         {shapesOpen ? (
           <View style={[glass, { position: 'absolute', top: 44, left: 0, width: 200, padding: space(2), backgroundColor: colors.surface, gap: 2 }]} accessibilityRole="menu">
             {SHAPES.map(([k, l]) => (
               <Pressable key={k} onPress={() => shop({ shape: k })} accessibilityRole="menuitem" style={(st) => ({ padding: space(2), borderRadius: radius.sm, backgroundColor: (st as { hovered?: boolean }).hovered || st.pressed ? 'rgba(123,97,255,0.18)' : 'transparent' })}>
-                <Text>{l}</Text>
+                <Text>{t(l)}</Text>
               </Pressable>
             ))}
           </View>
         ) : null}
       </View>
       <View style={{ flex: 1 }} />
-      {link('Try on', () => router.push('/tryon'), 'scan-outline')}
-      {link('Compare', () => router.push('/compare'), 'git-compare-outline')}
-      {link('Wishlist', () => router.push('/wishlist'), 'heart-outline')}
-      {stores ? link('Stores', () => router.push('/stores'), 'location-outline') : null}
+      {link(t('tryon'), () => router.push('/tryon'), 'scan-outline')}
+      {link(t('compare'), () => router.push('/compare'), 'git-compare-outline')}
+      {link(t('wishlist'), () => router.push('/wishlist'), 'heart-outline')}
+      {stores ? link(t('stores'), () => router.push('/stores'), 'location-outline') : null}
     </View>
   );
 }

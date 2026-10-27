@@ -569,3 +569,13 @@ model EyeTestRequest {
 
   @@index([status, createdAt])
 }
+
+/// Automatic translations of app text into Indian languages. Made once by AI, then reused for every customer.
+model Translation {
+  lang      String
+  source    String
+  text      String
+  createdAt DateTime @default(now())
+
+  @@id([lang, source])
+}

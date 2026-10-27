@@ -151,19 +151,19 @@ export const geminiModels = () => [...new Set([env.GEMINI_MODEL, ...MODEL_FALLBA
 let workingModel: string | null = null;           // remembered after the first success
 export const _resetGeminiModel = () => { workingModel = null; };
 
-async function callGemini(key: string, system: string, contents: object[]): Promise<string> {
+async function callGemini(key: string, system: string, contents: object[], maxTokens = 600, timeoutMs = 12_000): Promise<string> {
   const models = workingModel ? [workingModel, ...geminiModels().filter((m) => m !== workingModel)] : geminiModels();
   let last: unknown;
   // Busy/temporary errors (503 "high demand", 500, 502, 504), slow answers and retired models (404) move on to the
   // next model. Only ONE short retry per question, and at most ~8 s in total, so customers are never kept waiting
   // (the built-in answers take over after that). Key problems (400/401/403) and limits (429) stop here (next key).
   const TEMP = new Set([500, 502, 503, 504]);
-  const deadline = Date.now() + 8000;
+  const deadline = Date.now() + Math.max(8000, timeoutMs);
   let retried = false;
   for (let m = 0; m < models.length && Date.now() < deadline; m++) {
     const model = models[m];
     try {
-      const text = await callModel(model, key, system, contents);
+      const text = await callModel(model, key, system, contents, maxTokens, timeoutMs);
       workingModel = model;
       return text;
     } catch (e) {
@@ -181,12 +181,12 @@ async function callGemini(key: string, system: string, contents: object[]): Prom
   throw last;
 }
 
-async function callModel(model: string, key: string, system: string, contents: object[]): Promise<string> {
+async function callModel(model: string, key: string, system: string, contents: object[], maxTokens = 600, timeoutMs = 12_000): Promise<string> {
   const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
-    body: JSON.stringify({ systemInstruction: { parts: [{ text: system }] }, contents, generationConfig: { temperature: 0.4, maxOutputTokens: 600 } }),
-    signal: AbortSignal.timeout(12_000),   // a slow model must not hold the customer up
+    body: JSON.stringify({ systemInstruction: { parts: [{ text: system }] }, contents, generationConfig: { temperature: 0.4, maxOutputTokens: maxTokens } }),
+    signal: AbortSignal.timeout(timeoutMs),   // a slow model must not hold the customer up (translation allows longer)
   });
   if (!r.ok) { const e = new Error(`Gemini ${r.status}: ${(await r.text()).slice(0, 300)}`) as Error & { status?: number }; e.status = r.status; throw e; }
   const j = (await r.json()) as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
@@ -235,6 +235,18 @@ async function askGemini(system: string, history: ChatMessage[], image?: ChatIma
       if (status === 429) resting.set(key, Date.now() + REST_MS);
       logger.warn({ key: keys.indexOf(key) === 0 ? 'GEMINI_API_KEY' : 'GEMINI_API_KEY_2', status, next: n + 1 < order.length ? 'trying backup key' : 'built-in answers' }, 'Gemini key failed');
     }
+  }
+  throw last;
+}
+
+/** One plain request to Gemini (main key, then backup), used by automatic translation. */
+export async function askGeminiText(system: string, prompt: string, maxTokens = 4000): Promise<string> {
+  const now = Date.now(), keys = geminiKeys();
+  const ready = keys.filter((k) => (resting.get(k) ?? 0) <= now);
+  let last: unknown = new Error('No Gemini key');
+  for (const key of ready.length ? ready : keys) {
+    try { return await callGemini(key, system, [{ role: 'user', parts: [{ text: prompt }] }], maxTokens, 30_000); }
+    catch (e) { last = e; if ((e as { status?: number }).status === 429) resting.set(key, Date.now() + REST_MS); }
   }
   throw last;
 }

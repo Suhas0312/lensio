@@ -6,6 +6,7 @@ import { Product } from '@/api/types';
 import { useCompare } from '@/store/shopping';
 import { Button, Empty, Screen, Text } from '@/components/UI';
 import { inr, titleCase } from '@/lib/format';
+import { tr } from '@/i18n';
 import { colors, radius, space } from '@/theme';
 
 type RowDef = { label: string; get: (p: Product) => string; best?: 'low' | 'high'; num?: (p: Product) => number | null };
@@ -35,7 +36,7 @@ export default function Compare() {
   const colW = 150, labelW = 112;
   return (
     <Screen padded={false}>
-      <Stack.Screen options={{ title: `Compare ${items.length} frames` }} />
+      <Stack.Screen options={{ title: tr(`Compare ${items.length} frames`) }} />
       <ScrollView horizontal contentContainerStyle={{ padding: space(4) }}>
         <View>
           <View style={{ flexDirection: 'row' }}>

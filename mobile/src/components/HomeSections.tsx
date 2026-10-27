@@ -10,7 +10,7 @@ import { inr } from '@/lib/format';
 import { useRecent } from '@/lib/recent';
 import { useFeatures } from '@/lib/features';
 import { colors, gradient, radius, space } from '@/theme';
-import { useT } from '@/i18n';
+import { Key, useT } from '@/i18n';
 
 const open = (link: string) => { if (!link) return; if (link.startsWith('/')) router.push(link as never); else Linking.openURL(link); };
 const glass = { backgroundColor: 'rgba(21,27,77,0.62)', borderWidth: 1, borderColor: 'rgba(160,170,255,0.16)', borderRadius: radius.md } as const;
@@ -199,7 +199,7 @@ function SectionTitle({ title, action, onAction }: { title: string; action?: str
   );
 }
 
-const SHAPES: [string, string][] = [['RECTANGLE', 'Rectangle'], ['ROUND', 'Round'], ['CAT_EYE', 'Cat-eye'], ['AVIATOR', 'Aviator'], ['WAYFARER', 'Wayfarer'], ['SQUARE', 'Square'], ['OVAL', 'Oval'], ['GEOMETRIC', 'Geometric']];
+const SHAPES: [string, Key][] = [['RECTANGLE', 'shapeRectangle'], ['ROUND', 'shapeRound'], ['CAT_EYE', 'shapeCatEye'], ['AVIATOR', 'shapeAviator'], ['WAYFARER', 'shapeWayfarer'], ['SQUARE', 'shapeSquare'], ['OVAL', 'shapeOval'], ['GEOMETRIC', 'shapeGeometric']];
 /** Shop by frame shape: drawn frame tiles → Shop filtered by that shape. */
 export function ShopByShape() {
   const t = useT();
@@ -208,12 +208,12 @@ export function ShopByShape() {
       <SectionTitle title={t('shopByShape')} />
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space(3) }}>
         {SHAPES.map(([k, l]) => (
-          <Pressable key={k} onPress={() => router.push({ pathname: '/shop', params: { shape: k } })} accessibilityRole="button" accessibilityLabel={`${l} frames`}
+          <Pressable key={k} onPress={() => router.push({ pathname: '/shop', params: { shape: k } })} accessibilityRole="button" accessibilityLabel={t(l)}
             style={({ pressed }) => [{ width: 118, overflow: 'hidden', transform: [{ scale: pressed ? 0.96 : 1 }] }, glass]}>
             <View style={{ backgroundColor: '#F4F5FB', height: 72, justifyContent: 'center' }}>
               <Image source={{ uri: `${API_URL}/catalog/shape-art/${k}.png` }} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
             </View>
-            <Text v="bodyStrong" style={{ padding: space(2.5), textAlign: 'center' }}>{l}</Text>
+            <Text v="bodyStrong" style={{ padding: space(2.5), textAlign: 'center' }}>{t(l)}</Text>
           </Pressable>
         ))}
       </ScrollView>
@@ -221,12 +221,12 @@ export function ShopByShape() {
   );
 }
 
-const FACES: { face: string; best: string; label: string; tip: string }[] = [
-  { face: 'Round', best: 'RECTANGLE', label: 'Rectangle & square', tip: 'Angles add definition' },
-  { face: 'Square', best: 'ROUND', label: 'Round & oval', tip: 'Curves soften a strong jaw' },
-  { face: 'Oval', best: 'WAYFARER', label: 'Almost any shape', tip: 'Balanced proportions' },
-  { face: 'Heart', best: 'AVIATOR', label: 'Aviator & round', tip: 'Balance a wider forehead' },
-  { face: 'Long', best: 'SQUARE', label: 'Deep, bold frames', tip: 'Shorten a longer face' },
+const FACES: { face: Key; best: string; label: Key; tip: Key }[] = [
+  { face: 'faceRound', best: 'RECTANGLE', label: 'fitRound', tip: 'tipRound' },
+  { face: 'faceSquare', best: 'ROUND', label: 'fitSquare', tip: 'tipSquare' },
+  { face: 'faceOval', best: 'WAYFARER', label: 'fitOval', tip: 'tipOval' },
+  { face: 'faceHeart', best: 'AVIATOR', label: 'fitHeart', tip: 'tipHeart' },
+  { face: 'faceLong', best: 'SQUARE', label: 'fitLong', tip: 'tipLong' },
 ];
 /** Shop by face shape, with a shortcut to the AI face scan for customers who don't know theirs. */
 export function ShopByFace() {
@@ -236,12 +236,12 @@ export function ShopByFace() {
       <SectionTitle title={t('shopByFace')} action={t('notSureScan')} onAction={() => router.push('/tryon')} />
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space(3) }}>
         {FACES.map((f) => (
-          <Pressable key={f.face} onPress={() => router.push({ pathname: '/shop', params: { shape: f.best } })} accessibilityRole="button" accessibilityLabel={`Frames for a ${f.face.toLowerCase()} face`}
+          <Pressable key={f.face} onPress={() => router.push({ pathname: '/shop', params: { shape: f.best } })} accessibilityRole="button" accessibilityLabel={t(f.face)}
             style={({ pressed }) => [{ width: 150, padding: space(3), gap: space(1), transform: [{ scale: pressed ? 0.96 : 1 }] }, glass]}>
             <Ionicons name="happy-outline" size={24} color={colors.magenta} />
-            <Text v="bodyStrong">{f.face} face</Text>
-            <Text v="caption" color={colors.cyan}>{f.label}</Text>
-            <Text v="caption" color={colors.muted}>{f.tip}</Text>
+            <Text v="bodyStrong">{t(f.face)}</Text>
+            <Text v="caption" color={colors.cyan}>{t(f.label)}</Text>
+            <Text v="caption" color={colors.muted}>{t(f.tip)}</Text>
           </Pressable>
         ))}
       </ScrollView>
@@ -249,10 +249,10 @@ export function ShopByFace() {
   );
 }
 
-const COLLECTIONS: { t: string; icon: keyof typeof Ionicons.glyphMap; params: Record<string, string> }[] = [
-  { t: 'Men', icon: 'man-outline', params: { gender: 'MEN' } }, { t: 'Women', icon: 'woman-outline', params: { gender: 'WOMEN' } },
-  { t: 'Kids', icon: 'happy-outline', params: { gender: 'KIDS' } }, { t: 'Eyeglasses', icon: 'glasses-outline', params: { kind: 'eyeglasses' } },
-  { t: 'Sunglasses', icon: 'sunny-outline', params: { kind: 'sunglasses' } }, { t: 'Titanium', icon: 'diamond-outline', params: { material: 'TITANIUM' } },
+const COLLECTIONS: { t: Key; icon: keyof typeof Ionicons.glyphMap; params: Record<string, string> }[] = [
+  { t: 'men', icon: 'man-outline', params: { gender: 'MEN' } }, { t: 'women', icon: 'woman-outline', params: { gender: 'WOMEN' } },
+  { t: 'kids', icon: 'happy-outline', params: { gender: 'KIDS' } }, { t: 'eyeglasses', icon: 'glasses-outline', params: { kind: 'eyeglasses' } },
+  { t: 'sunglasses', icon: 'sunny-outline', params: { kind: 'sunglasses' } }, { t: 'titanium', icon: 'diamond-outline', params: { material: 'TITANIUM' } },
 ];
 /** Collections: who it's for, type and material. */
 export function Collections() {
@@ -265,7 +265,7 @@ export function Collections() {
           <Pressable key={c.t} onPress={() => router.push({ pathname: '/shop', params: c.params })} accessibilityRole="button"
             style={({ pressed }) => [{ flexBasis: '30%', flexGrow: 1, minWidth: 100, padding: space(3), flexDirection: 'row', alignItems: 'center', gap: space(2), transform: [{ scale: pressed ? 0.97 : 1 }] }, glass]}>
             <Ionicons name={c.icon} size={22} color={colors.cyan} />
-            <Text v="bodyStrong">{c.t}</Text>
+            <Text v="bodyStrong">{t(c.t)}</Text>
           </Pressable>
         ))}
       </View>

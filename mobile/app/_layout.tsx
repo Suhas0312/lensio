@@ -1,5 +1,6 @@
 import 'react-native-gesture-handler';
 import '@/lib/webPolyfills';
+import '@/i18n/alerts';
 import { useEffect } from 'react';
 import { Platform, View } from 'react-native';
 import { Stack, router, useSegments } from 'expo-router';
@@ -12,7 +13,7 @@ import { UpdatePrompt } from '@/components/UpdatePrompt';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { BackButton } from '@/components/BackButton';
 import { colors, font } from '@/theme';
-import { useLang } from '@/i18n';
+import { useLang, useTr } from '@/i18n';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -20,6 +21,7 @@ export default function RootLayout() {
   const [fontsLoaded] = useFonts({ Quicksand_500Medium, Quicksand_600SemiBold, Quicksand_700Bold });
   const { ready, user, boot } = useAuth();
   const segments = useSegments();
+  const tr = useTr();
 
   useEffect(() => { boot(); useLang.getState().init(); }, [boot]);
   useEffect(() => { if (fontsLoaded && ready) SplashScreen.hideAsync(); }, [fontsLoaded, ready]);
@@ -45,19 +47,19 @@ export default function RootLayout() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="(auth)/login" options={{ headerShown: false, presentation: 'modal', animation: 'slide_from_bottom' }} />
         <Stack.Screen name="product/[slug]" options={{ title: '' }} />
-        <Stack.Screen name="lens/[variantId]" options={{ title: 'Choose lenses' }} />
-        <Stack.Screen name="prescription/new" options={{ title: 'Add prescription' }} />
-        <Stack.Screen name="cart" options={{ title: 'Cart' }} />
-        <Stack.Screen name="checkout" options={{ title: 'Checkout' }} />
-        <Stack.Screen name="order/[id]" options={{ title: 'Order' }} />
-        <Stack.Screen name="address/new" options={{ title: 'New address' }} />
-        <Stack.Screen name="assistant" options={{ title: 'Lensio assistant' }} />
-        <Stack.Screen name="review/new" options={{ title: 'Write a review' }} />
-        <Stack.Screen name="wishlist" options={{ title: 'My wishlist' }} />
-        <Stack.Screen name="compare" options={{ title: 'Compare frames' }} />
-        <Stack.Screen name="stores" options={{ title: 'Find a store' }} />
-        <Stack.Screen name="eye-test" options={{ title: 'Eye test at home' }} />
-        <Stack.Screen name="rewards" options={{ title: 'Lensio Rewards' }} />
+        <Stack.Screen name="lens/[variantId]" options={{ title: tr('Choose lenses') }} />
+        <Stack.Screen name="prescription/new" options={{ title: tr('Add prescription') }} />
+        <Stack.Screen name="cart" options={{ title: tr('Cart') }} />
+        <Stack.Screen name="checkout" options={{ title: tr('Checkout') }} />
+        <Stack.Screen name="order/[id]" options={{ title: tr('Order') }} />
+        <Stack.Screen name="address/new" options={{ title: tr('New address') }} />
+        <Stack.Screen name="assistant" options={{ title: tr('Lensio assistant') }} />
+        <Stack.Screen name="review/new" options={{ title: tr('Write a review') }} />
+        <Stack.Screen name="wishlist" options={{ title: tr('My wishlist') }} />
+        <Stack.Screen name="compare" options={{ title: tr('Compare frames') }} />
+        <Stack.Screen name="stores" options={{ title: tr('Find a store') }} />
+        <Stack.Screen name="eye-test" options={{ title: tr('Eye test at home') }} />
+        <Stack.Screen name="rewards" options={{ title: tr('Lensio Rewards') }} />
       </Stack>
       <UpdatePrompt />
       <OfflineBanner />

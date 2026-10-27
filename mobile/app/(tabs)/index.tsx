@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Linking, Platform, Pressable, ScrollView, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { Linking, Platform, Pressable, ScrollView, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,9 +19,9 @@ import { useAppUpdate } from '@/lib/appUpdate';
 import { useFeatures } from '@/lib/features';
 import { Collections, HomeBanners, RecentlyViewed, ShopByFace, ShopByShape } from '@/components/HomeSections';
 import { DesktopNav, ShopByOccasion } from '@/components/Discovery';
-import { useT } from '@/i18n';
+import { Key, useT } from '@/i18n';
 
-const SHAPES = [['RECTANGLE', 'Rectangle'], ['ROUND', 'Round'], ['CAT_EYE', 'Cat-eye'], ['AVIATOR', 'Aviator'], ['WAYFARER', 'Wayfarer'], ['SQUARE', 'Square']];
+const SHAPES: [string, Key][] = [['RECTANGLE', 'shapeRectangle'], ['ROUND', 'shapeRound'], ['CAT_EYE', 'shapeCatEye'], ['AVIATOR', 'shapeAviator'], ['WAYFARER', 'shapeWayfarer'], ['SQUARE', 'shapeSquare']];
 
 export default function Home() {
   const features = useFeatures();
@@ -63,20 +63,20 @@ export default function Home() {
         <Logo variant="wordmark" height={30} />
         <Row style={{ gap: space(4) }}>
           <VoiceButton size={20} onFinal={(t) => router.push({ pathname: '/shop', params: { voice: t } })} />
-          <Pressable onPress={() => router.push('/shop')} accessibilityLabel="Search"><Ionicons name="search" size={22} color={colors.text} /></Pressable>
-          <Pressable onPress={() => router.push('/cart')} accessibilityLabel="Cart"><Ionicons name="bag-outline" size={22} color={colors.text} /></Pressable>
+          <Pressable onPress={() => router.push('/shop')} accessibilityLabel={t('search')}><Ionicons name="search" size={22} color={colors.text} /></Pressable>
+          <Pressable onPress={() => router.push('/cart')} accessibilityLabel={t('cart')}><Ionicons name="bag-outline" size={22} color={colors.text} /></Pressable>
         </Row>
       </Row>
       <ScrollView contentContainerStyle={{ padding: pad, gap: space(7), paddingBottom: space(12) }}>
         {webTip ? (
           <View style={{ backgroundColor: colors.surface, borderColor: colors.line, borderWidth: 1, borderRadius: radius.md, padding: space(4), gap: space(2) }}>
-            <Text v="bodyStrong">{webTip === 'ios' ? 'Add Lensio to your Home Screen' : 'Get the Lensio Android app'}</Text>
+            <Text v="bodyStrong">{webTip === 'ios' ? t('tipIosTitle') : t('tipAndroidTitle')}</Text>
             <Text v="caption" color={colors.muted}>
-              {webTip === 'ios' ? 'Tap the Share button in Safari, then "Add to Home Screen". Lensio then opens like an app.' : 'Faster, with camera try-on. Free download, no Play Store needed.'}
+              {webTip === 'ios' ? t('tipIosBody') : t('tipAndroidBody')}
             </Text>
             <Row style={{ gap: space(4) }}>
-              {webTip === 'android' ? <Pressable onPress={() => Linking.openURL('/download')}><Text v="caption" color={colors.cyan}>Download the app</Text></Pressable> : null}
-              <Pressable onPress={dismissTip}><Text v="caption" color={colors.muted}>Not now</Text></Pressable>
+              {webTip === 'android' ? <Pressable onPress={() => Linking.openURL('/download')}><Text v="caption" color={colors.cyan}>{t('downloadApp')}</Text></Pressable> : null}
+              <Pressable onPress={dismissTip}><Text v="caption" color={colors.muted}>{t('notNow')}</Text></Pressable>
             </Row>
           </View>
         ) : null}
@@ -87,8 +87,8 @@ export default function Home() {
             style={{ backgroundColor: colors.surface, borderColor: '#F5A524', borderWidth: 1, borderRadius: radius.md, padding: space(4), flexDirection: 'row', alignItems: 'center', gap: space(3) }}>
             <Text style={{ fontSize: 26, color: '#F5A524' }}>★</Text>
             <View style={{ flex: 1 }}>
-              <Text v="bodyStrong">How are your {toReview[0].productName}?</Text>
-              <Text v="caption" color={colors.muted}>{toReview.length > 1 ? `Rate your ${toReview.length} recent frames. It takes a minute` : 'Tap to rate them and help other shoppers choose'}</Text>
+              <Text v="bodyStrong">{t('reviewAsk', { name: toReview[0].productName })}</Text>
+              <Text v="caption" color={colors.muted}>{toReview.length > 1 ? t('reviewMany', { n: toReview.length }) : t('reviewOne')}</Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={colors.faint} />
           </Pressable>
@@ -97,37 +97,36 @@ export default function Home() {
           <Pressable onPress={showUpdate} accessibilityRole="button"
             style={{ backgroundColor: colors.surface, borderColor: colors.cyan, borderWidth: 1, borderRadius: radius.md, padding: space(4), flexDirection: 'row', alignItems: 'center', gap: space(3) }}>
             <Ionicons name="arrow-down-circle-outline" size={26} color={colors.cyan} />
-            <View style={{ flex: 1 }}><Text v="bodyStrong">Update available: version {update.version}</Text><Text v="caption" color={colors.muted}>Tap to update. Your account and orders stay.</Text></View>
+            <View style={{ flex: 1 }}><Text v="bodyStrong">{t('updateAvailable', { v: update.version })}</Text><Text v="caption" color={colors.muted}>{t('updateNote')}</Text></View>
           </Pressable>
         ) : null}
         <HomeBanners width={contentW} />
-        <ScanHero />
         <FeatureTiles />
         <DesktopNav />
         <Collections />
         {/* Hero: the one place the brand gradient gets room to breathe */}
         <LinearGradient colors={gradient as unknown as string[]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ borderRadius: radius.lg, padding: 1.5 }}>
           <View style={{ backgroundColor: colors.surface, borderRadius: radius.lg - 1.5, padding: wide ? space(8) : space(5), gap: space(3) }}>
-            <Text v="display" style={{ maxWidth: 620 }}>Frames with lenses, made to your prescription</Text>
-            <Text color={colors.muted} style={{ maxWidth: 620 }}>10% off your first frame + lens combo with code FIRST10.</Text>
+            <Text v="display" style={{ maxWidth: 620 }}>{t('heroTitle')}</Text>
+            <Text color={colors.muted} style={{ maxWidth: 620 }}>{t('heroOffer', { code: 'FIRST10' })}</Text>
             <Row style={{ marginTop: space(2) }}>
               <Pressable onPress={() => router.push('/shop')} style={{ backgroundColor: colors.text, borderRadius: radius.pill, paddingHorizontal: space(5), paddingVertical: space(3) }}>
-                <Text v="bodyStrong" color={colors.night}>Shop eyeglasses</Text>
+                <Text v="bodyStrong" color={colors.night}>{t('shopEyeglasses')}</Text>
               </Pressable>
               <Pressable onPress={() => router.push('/tryon')} style={{ paddingHorizontal: space(3), paddingVertical: space(3) }}>
-                <Text v="bodyStrong" color={colors.cyan}>Try frames on</Text>
+                <Text v="bodyStrong" color={colors.cyan}>{t('tryFramesOn')}</Text>
               </Pressable>
             </Row>
           </View>
         </LinearGradient>
 
         <View style={{ gap: space(3) }}>
-          <Text v="title">Shop by shape</Text>
+          <Text v="title">{t('shopByShapeShort')}</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space(2.5) }}>
             {SHAPES.map(([k, label]) => (
               <Pressable key={k} onPress={() => router.push({ pathname: '/shop', params: { shape: k } })}
                 style={{ borderWidth: 1, borderColor: colors.line, borderRadius: radius.md, paddingHorizontal: space(4), paddingVertical: space(3), backgroundColor: colors.surface }}>
-                <Text v="bodyStrong">{label}</Text>
+                <Text v="bodyStrong">{t(label)}</Text>
               </Pressable>
             ))}
           </ScrollView>
@@ -135,10 +134,10 @@ export default function Home() {
 
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space(3) }}>
           {[
-            ...(features.eyeTest ? [{ icon: 'home-outline' as const, t: 'Eye test at home', to: '/eye-test' }] : []),
-            { icon: 'document-text-outline' as const, t: 'Upload prescription', to: '/prescription/new' },
-            { icon: 'scan-outline' as const, t: 'Try frames on', to: '/tryon' },
-            ...(features.stores ? [{ icon: 'location-outline' as const, t: 'Find a store', to: '/stores' }] : []),
+            ...(features.eyeTest ? [{ icon: 'home-outline' as const, t: t('eyeTest'), to: '/eye-test' }] : []),
+            { icon: 'document-text-outline' as const, t: t('uploadPrescription'), to: '/prescription/new' },
+            { icon: 'scan-outline' as const, t: t('tryFramesOn'), to: '/tryon' },
+            ...(features.stores ? [{ icon: 'location-outline' as const, t: t('findStore'), to: '/stores' }] : []),
           ].map((c) => (
             <Pressable key={c.t} onPress={() => router.push(c.to)} style={{ flexGrow: 1, flexBasis: wide ? '22%' : '45%', backgroundColor: colors.surface, borderRadius: radius.md, padding: space(4), gap: space(2), borderWidth: 1, borderColor: colors.line }}>
               <Ionicons name={c.icon} size={22} color={colors.cyan} />
@@ -180,7 +179,7 @@ export default function Home() {
           <Logo variant="tagline" height={16} />
           {insta ? (
             <Pressable onPress={() => Linking.openURL(insta)} style={{ flexDirection: 'row', alignItems: 'center', gap: space(2), marginTop: space(3) }} accessibilityRole="link">
-              <Ionicons name="logo-instagram" size={18} color={colors.magenta} /><Text v="caption" color={colors.muted}>Follow us on Instagram</Text>
+              <Ionicons name="logo-instagram" size={18} color={colors.magenta} /><Text v="caption" color={colors.muted}>{t('followInsta')}</Text>
             </Pressable>
           ) : null}
         </View>
@@ -190,65 +189,25 @@ export default function Home() {
   );
 }
 
-/** Animated AI face-scan banner: floating glasses and a pulsing scan ring. */
-function ScanHero() {
-  const float = useRef(new Animated.Value(0)).current, pulse = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    const native = Platform.OS !== 'web';
-    const a = Animated.loop(Animated.sequence([
-      Animated.timing(float, { toValue: 1, duration: 1800, easing: Easing.inOut(Easing.sin), useNativeDriver: native }),
-      Animated.timing(float, { toValue: 0, duration: 1800, easing: Easing.inOut(Easing.sin), useNativeDriver: native }),
-    ]));
-    const b = Animated.loop(Animated.timing(pulse, { toValue: 1, duration: 2200, easing: Easing.out(Easing.quad), useNativeDriver: native }));
-    a.start(); b.start();
-    return () => { a.stop(); b.stop(); };
-  }, [float, pulse]);
-  const y = float.interpolate({ inputRange: [0, 1], outputRange: [0, -8] });
-  const ringScale = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1.35] });
-  const ringOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.7, 0] });
-  return (
-    <Pressable onPress={() => router.push('/tryon')} accessibilityRole="button" accessibilityLabel="Start your AI face scan">
-      {({ pressed }) => (
-        <LinearGradient colors={['#4f46e5', '#7c3aed', '#0891b2']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-          style={{ borderRadius: radius.lg, padding: space(5), flexDirection: 'row', alignItems: 'center', gap: space(4), overflow: 'hidden', transform: [{ scale: pressed ? 0.98 : 1 }] }}>
-          <View style={{ flex: 1, gap: space(1) }}>
-            <Text v="caption" color="#e0e7ff" style={{ letterSpacing: 1 }}>NEW · AI POWERED</Text>
-            <Text v="title" color="#fff">✨ AI face scan</Text>
-            <Text color="#e0e7ff">Face shape, exact frame size and PD in 10 seconds, with voice guidance. Then frames picked for you.</Text>
-            <View style={{ alignSelf: 'flex-start', backgroundColor: '#fff', borderRadius: radius.pill, paddingHorizontal: space(4), paddingVertical: space(2), marginTop: space(2) }}>
-              <Text v="bodyStrong" color="#4f46e5">Scan my face →</Text>
-            </View>
-          </View>
-          <View style={{ width: 92, height: 92, alignItems: 'center', justifyContent: 'center' }}>
-            <Animated.View style={{ position: 'absolute', width: 92, height: 92, borderRadius: 46, borderWidth: 2, borderColor: '#a5f3fc', opacity: ringOpacity, transform: [{ scale: ringScale }] }} />
-            <Animated.View style={{ transform: [{ translateY: y }] }}>
-              <Ionicons name="glasses-outline" size={56} color="#fff" />
-            </Animated.View>
-          </View>
-        </LinearGradient>
-      )}
-    </Pressable>
-  );
-}
-
 /** Quick feature tiles (glass style). */
 function FeatureTiles() {
   const { eyeTest } = useFeatures();
+  const t = useT();
   const tiles: { icon: keyof typeof Ionicons.glyphMap; title: string; sub: string; go: () => void }[] = [
-    { icon: 'scan-outline', title: 'Face scan', sub: 'Shape + size', go: () => router.push('/tryon') },
-    { icon: 'camera-outline', title: 'Try on', sub: 'Live 3D fit', go: () => router.push('/tryon') },
-    { icon: 'git-compare-outline', title: 'Compare', sub: 'Side by side', go: () => router.push('/compare') },
-    { icon: 'heart-outline', title: 'Wishlist', sub: 'Saved frames', go: () => router.push('/wishlist') },
-    ...(eyeTest ? [{ icon: 'home-outline' as const, title: 'Eye test', sub: 'At home', go: () => router.push('/eye-test') }] : []),
+    { icon: 'scan-outline', title: t('faceScan'), sub: t('shapeSize'), go: () => router.push('/tryon') },
+    { icon: 'camera-outline', title: t('tryon'), sub: t('live3d'), go: () => router.push('/tryon') },
+    { icon: 'git-compare-outline', title: t('compare'), sub: t('sideBySide'), go: () => router.push('/compare') },
+    { icon: 'heart-outline', title: t('wishlist'), sub: t('savedFrames'), go: () => router.push('/wishlist') },
+    ...(eyeTest ? [{ icon: 'home-outline' as const, title: t('eyeTestShort'), sub: t('atHome'), go: () => router.push('/eye-test') }] : []),
   ];
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space(3) }}>
-      {tiles.map((t) => (
-        <Pressable key={t.title} onPress={t.go} accessibilityRole="button" accessibilityLabel={t.title}
+      {tiles.map((x) => (
+        <Pressable key={x.title} onPress={x.go} accessibilityRole="button" accessibilityLabel={x.title}
           style={({ pressed }) => ({ width: 112, padding: space(3), gap: space(1), borderRadius: radius.md, backgroundColor: 'rgba(21,27,77,0.62)', borderWidth: 1, borderColor: 'rgba(160,170,255,0.16)', transform: [{ scale: pressed ? 0.96 : 1 }] })}>
-          <Ionicons name={t.icon} size={24} color={colors.cyan} />
-          <Text v="bodyStrong">{t.title}</Text>
-          <Text v="caption" color={colors.muted}>{t.sub}</Text>
+          <Ionicons name={x.icon} size={24} color={colors.cyan} />
+          <Text v="bodyStrong">{x.title}</Text>
+          <Text v="caption" color={colors.muted}>{x.sub}</Text>
         </Pressable>
       ))}
     </ScrollView>

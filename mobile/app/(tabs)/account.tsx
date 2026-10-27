@@ -105,7 +105,7 @@ export default function Account() {
           </Row>
           {rx.length ? rx.map((p) => (
             <Row key={p.id} style={{ justifyContent: 'space-between' }}>
-              <View><Text>{p.label}</Text><Text v="caption" color={colors.muted}>{p.source === 'UPLOAD' ? 'Photo' : 'Entered manually'}</Text></View>
+              <View><Text raw>{p.label}</Text><Text v="caption" color={colors.muted}>{p.source === 'UPLOAD' ? 'Photo' : 'Entered manually'}</Text></View>
               <Text v="caption" color={p.status === 'VERIFIED' ? colors.success : p.status === 'REJECTED' ? colors.danger : colors.warning}>
                 {p.status === 'VERIFIED' ? 'Verified' : p.status === 'REJECTED' ? 'Needs a new copy' : 'Checking'}
               </Text>

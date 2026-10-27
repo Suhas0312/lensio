@@ -31,6 +31,7 @@ import reviewRoutes from './modules/reviews/reviews.routes';
 import storeRoutes from './modules/stores/stores.routes';
 import eyeTestRoutes from './modules/eyetest/eyetest.routes';
 import loyaltyRoutes from './modules/loyalty/loyalty.routes';
+import i18nRoutes from './modules/i18n/translate.routes';
 
 export function createApp() {
   const app = express();
@@ -118,6 +119,7 @@ export function createApp() {
   app.use('/v1/stores', storeRoutes);
   app.use('/v1/eye-test', eyeTestRoutes);
   app.use('/v1/loyalty', loyaltyRoutes);
+  app.use('/v1/i18n', i18nRoutes);
 
   if (!isProd) app.use('/dev-files', express.static(localUploadDir));
   app.use('/media', express.static(localPublicDir, { maxAge: '365d', immutable: true }));

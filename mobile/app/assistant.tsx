@@ -151,7 +151,7 @@ function Bubble({ m, onWhatsApp }: { m: Msg; onWhatsApp: () => void }) {
       <View style={{ maxWidth: '86%', backgroundColor: mine ? colors.violet : colors.surface, borderWidth: mine ? 0 : 1, borderColor: m.failed ? colors.danger : colors.line,
         borderRadius: 18, borderBottomRightRadius: mine ? 6 : 18, borderBottomLeftRadius: mine ? 18 : 6, paddingHorizontal: space(4), paddingVertical: space(3) }}>
         {m.imageUri ? <Image source={{ uri: m.imageUri }} style={{ width: 200, height: 150, borderRadius: 12, marginBottom: space(2) }} resizeMode="cover" accessibilityLabel="Your photo" /> : null}
-        <Text color={m.failed ? colors.danger : colors.text} selectable>{m.text}</Text>
+        <Text color={m.failed ? colors.danger : colors.text} selectable raw>{m.text}</Text>
       </View>
       {m.products?.length ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space(2) }} style={{ maxWidth: '100%' }}>
