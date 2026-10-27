@@ -8,6 +8,7 @@ import { env } from '../config/env';
 import { sendReviewRequestEmail } from '../lib/mail';
 import { notifyOrderUpdate } from '../modules/notifications/whatsapp.service';
 import { refreshToken as refreshInstagramToken } from '../modules/instagram/instagram.service';
+import { translateAppPhrases } from '../modules/i18n/translate.routes';
 
 /** Two days after delivery, ask the customer to review what they bought (once per order). */
 export async function sendReviewRequests() {
@@ -88,4 +89,7 @@ export function startJobs() {
   setInterval(() => void tick(refreshCourierTracking, 'courier-tracking'), 2 * 3600_000);
   setInterval(() => void tick(sendReviewRequests, 'review-requests'), 3 * 3600_000);
   setInterval(() => void tick(refreshInstagramToken, 'instagram-token'), 7 * 86_400_000);
+  // Translate the whole app into every language in the background (only what is missing).
+  setTimeout(() => void tick(translateAppPhrases, 'app-translation'), 2 * 60_000);
+  setInterval(() => void tick(translateAppPhrases, 'app-translation'), 6 * 3600_000);
 }

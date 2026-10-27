@@ -19,7 +19,9 @@ const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 function table(lang: string) {
   if (cache[lang]) return cache[lang];
-  const src = PHRASES[lang] ?? {};
+  // Built-in phrases win; sentence patterns the server translated ("Showing {0} of {1} frames") are used too.
+  const learnedPatterns = Object.entries(learned[lang] ?? {}).filter(([en]) => /\{#?\d\}/.test(en));
+  const src = { ...Object.fromEntries(learnedPatterns), ...(PHRASES[lang] ?? {}) };
   const exact: Record<string, string> = {}, patterns: Pattern[] = [];
   for (const [en, tr] of Object.entries(src)) {
     const k = norm(en);
@@ -59,7 +61,7 @@ export function learn(lang: string, dict: Record<string, string>) {
   const d = (learned[lang] ??= {});
   let added = 0;
   for (const [k, v] of Object.entries(dict)) if (typeof v === 'string' && v && d[k] !== v) { d[k] = v; added++; }
-  if (added) useAutoDict.setState((s) => ({ v: s.v + 1 }));
+  if (added) { delete cache[lang]; useAutoDict.setState((s) => ({ v: s.v + 1 })); }
   return added;
 }
 export const learnedFor = (lang: string) => learned[lang] ?? {};
