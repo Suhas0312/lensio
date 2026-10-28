@@ -1,0 +1,74 @@
+# iPhone app build → TestFlight / App Store.
+# AUTOMATIC once the one-time Apple setup in docs/IOS-SETUP.md is done: every upload that changes the app (mobile/)
+# builds a new iPhone version and sends it to TestFlight. Until then it just says "not set up yet" and stops (no error).
+# Manual run: GitHub → Actions → "iPhone app release" → Run workflow.
+
+name: iPhone app release
+
+on:
+  push:
+    branches: [main]
+    paths: ['mobile/**', '!mobile/**/*.md', '!mobile/build-*.sh', '!mobile/build-*.bat']
+  workflow_dispatch:
+    inputs:
+      submit:
+        description: "Send the build to App Store Connect (TestFlight) when it finishes"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    defaults:
+      run:
+        working-directory: mobile
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      EAS_NO_VCS: '1'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Is the Apple setup done?
+        id: setup
+        env:
+          SUBMIT: ${{ github.event_name == 'push' || github.event.inputs.submit == 'true' }}
+        run: |
+          if [ -z "$EXPO_TOKEN" ] || grep -q REPLACE_ME eas.json; then
+            echo "ready=no" >> "$GITHUB_OUTPUT"
+            echo "### iPhone app: not set up yet" >> "$GITHUB_STEP_SUMMARY"
+            echo "Nothing was built. Do the one-time Apple setup in docs/IOS-SETUP.md; after that every app upload builds the iPhone app too." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "ready=yes" >> "$GITHUB_OUTPUT"
+            [ "$SUBMIT" = "true" ] && echo "submit=yes" >> "$GITHUB_OUTPUT" || echo "submit=no" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install app packages
+        if: steps.setup.outputs.ready == 'yes'
+        run: npm ci --no-audit --no-fund
+
+      - name: Build the iPhone app on Expo (15-45 minutes)
+        if: steps.setup.outputs.ready == 'yes'
+        run: |
+          extra=""
+          [ "${{ steps.setup.outputs.submit }}" = "yes" ] && extra="--auto-submit"
+          npx --yes eas-cli@16 build -p ios --profile production --non-interactive --wait $extra
+
+      - name: Summary
+        if: steps.setup.outputs.ready == 'yes'
+        run: |
+          echo "### iPhone build finished" >> "$GITHUB_STEP_SUMMARY"
+          echo "If 'Send the build' was on, it appears in App Store Connect → TestFlight in about 10-30 minutes." >> "$GITHUB_STEP_SUMMARY"
