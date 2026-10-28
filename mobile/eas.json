@@ -25,6 +25,9 @@
       "autoIncrement": true,
       "env": {
         "EXPO_PUBLIC_API_URL": "https://lensio-api.onrender.com/v1"
+      },
+      "ios": {
+        "resourceClass": "m-medium"
       }
     }
   },

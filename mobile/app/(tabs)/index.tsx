@@ -17,7 +17,7 @@ import { Row, Text } from '@/components/UI';
 import { colors, gradient, radius, space } from '@/theme';
 import { useAppUpdate } from '@/lib/appUpdate';
 import { useFeatures } from '@/lib/features';
-import { Collections, HomeBanners, RecentlyViewed, ShopByFace, ShopByShape } from '@/components/HomeSections';
+import { Collections, RecentlyViewed, ShopByFace, ShopByShape } from '@/components/HomeSections';
 import { DesktopNav, ShopByOccasion } from '@/components/Discovery';
 import { Key, useT } from '@/i18n';
 
@@ -27,7 +27,6 @@ export default function Home() {
   const features = useFeatures();
   const t = useT();
   const { cardW, cols, wide, pad, content } = useLayout();
-  const contentW = content - pad * 2;   // banner carousel width
   const [bestsellers, setBestsellers] = useState<Product[]>([]);
   const [newest, setNewest] = useState<Product[]>([]);
   const user = useAuth((st) => st.user);
@@ -100,7 +99,6 @@ export default function Home() {
             <View style={{ flex: 1 }}><Text v="bodyStrong">{t('updateAvailable', { v: update.version })}</Text><Text v="caption" color={colors.muted}>{t('updateNote')}</Text></View>
           </Pressable>
         ) : null}
-        <HomeBanners width={contentW} />
         <FeatureTiles />
         <DesktopNav />
         <Collections />
