@@ -1,7 +1,7 @@
-# Lensio release robot, version 2026-10-22 (builds the APK on GitHub; Expo's servers as automatic backup).
-# Android release, only when YOU raise the version.
-# A release is built when "version" in mobile/app.json is higher than the newest release (e.g. 3.3.0 → 3.4.0).
-# Small fixes uploaded without changing the version do NOT create a new app version.
+# Lensio release robot, version 2026-10-28 (builds the APK on GitHub; Expo's servers as automatic backup).
+# Android release, AUTOMATIC: every upload that changes the app (files in mobile/) builds and publishes a new
+# app version by itself (3.9.0 → 3.9.1 → …). Raising "version" in mobile/app.json picks a bigger number (e.g. 4.0.0).
+# Uploads that only change notes (*.md) or build scripts do not create a release.
 # Manual run (Actions tab → Run workflow) can force a release; it then uses the next patch number.
 #   1. builds the APK on GitHub's own machine (free, unlimited for public repos); if that fails it automatically tries
 #      Expo's servers (limited free builds per month), 2. publishes a GitHub release with lensio.apk.
@@ -50,7 +50,7 @@ jobs:
     steps:
       - name: Robot version
         working-directory: .
-        run: echo "Lensio release robot, version 2026-10-22 (builds on GitHub; Expo as backup). Run ${{ github.run_number }}, attempt ${{ github.run_attempt }}."
+        run: echo "Lensio release robot, version 2026-10-28 (builds on GitHub; Expo as backup). Run ${{ github.run_number }}, attempt ${{ github.run_attempt }}."
 
       - uses: actions/checkout@v5
         with:
@@ -73,16 +73,23 @@ jobs:
         id: gate
         env:
           FORCE: ${{ github.event.inputs.force }}
+          BEFORE: ${{ github.event.before }}
+          EVENT: ${{ github.event_name }}
         run: |
+          auto=no
+          if [ "$EVENT" = "push" ]; then
+            changed=$(git diff --name-only "$BEFORE" "$GITHUB_SHA" -- . 2>/dev/null | grep -vE '\.md$|build-[a-z-]+\.(sh|bat)$' || true)
+            [ -n "$changed" ] && auto=yes && echo "App files changed:" && echo "$changed" | head -20
+          fi
           want=$(node -p "require('./app.json').expo.version")
           latest=$(git tag -l 'v*' | sed 's/^v//' | sort -V | tail -1)
           newest=$(printf '%s\n%s\n' "$want" "${latest:-0.0.0}" | sort -V | tail -1)
-          if [ "$FORCE" = "true" ] || { [ "$want" != "$latest" ] && [ "$newest" = "$want" ]; }; then
+          if [ "$FORCE" = "true" ] || [ "$auto" = "yes" ] || { [ "$want" != "$latest" ] && [ "$newest" = "$want" ]; }; then
             echo "release=yes" >> "$GITHUB_OUTPUT"; echo "Releasing (app.json $want, newest release ${latest:-none})"
           else
             echo "release=no" >> "$GITHUB_OUTPUT"
             echo "### No new app version" >> "$GITHUB_STEP_SUMMARY"
-            echo "mobile/app.json says $want and release v$latest already exists. Raise the version in mobile/app.json to publish a new app." >> "$GITHUB_STEP_SUMMARY"
+            echo "mobile/app.json says $want and release v$latest already exists. Only notes changed, so no new app was built." >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Pick the version
