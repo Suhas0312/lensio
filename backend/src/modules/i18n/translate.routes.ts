@@ -18,7 +18,7 @@ export const LANG_NAMES: Record<string, string> = {
   hi: 'Hindi', kn: 'Kannada', ta: 'Tamil', te: 'Telugu', ml: 'Malayalam', mr: 'Marathi',
   bn: 'Bengali', gu: 'Gujarati', pa: 'Punjabi', or: 'Odia',
 };
-const MAX_LEN = 400;
+const MAX_LEN = 1500;   // long enough for product descriptions written in the admin panel
 const BATCH = 25;
 
 const system = (language: string) => `You translate the screen text of Lensio, an Indian online eyewear shop (frames, prescription lenses, sunglasses), from English into ${language}.
@@ -26,9 +26,10 @@ You get a JSON array of English texts. Reply with ONLY a JSON array of the ${lan
 Rules:
 - Write natural, simple, friendly ${language} that ordinary shoppers in India use. Short labels stay short. Buttons are polite commands.
 - Keep exactly as written: placeholders like {0}, {1} and {#0} (move them to where they belong in the sentence), numbers, ₹ amounts, emojis, symbols (→ ✓ ★ · • ♥), email addresses, links, codes such as FIRST10.
-- Do not translate: the brand Lensio, frame and product model names (e.g. "Vista Rectangle", "Orbit Round"), people's names, place names, and app or payment names (WhatsApp, Google Pay, PhonePe, Paytm, UPI, Instagram, Safari, Chrome, Android).
+- Frame and product names: keep the model name itself (an invented word such as Vista, Orbit, Iris, Pixel, Skyline, Drift) in English letters, but translate the ordinary words in the name, e.g. "Vista Rectangle" → "Vista" + the word for rectangle, "Pixel Kids" → "Pixel" + the word for kids. Translate colour names (Matte black, Gold / green), descriptions and sizes.
+- Do not translate: the brand Lensio, other brand names, people's names, place names, and app or payment names (WhatsApp, Google Pay, PhonePe, Paytm, UPI, Instagram, Safari, Chrome, Android).
 - Keep optical terms shoppers know in English where usual (SPH, CYL, AXIS, ADD, PD, TR90, 1.56, 1.60) and you may write common English shopping words in ${language} script if that is how people say them.
-- If a text is only a name, code or number, return it unchanged.`;
+- If a text is only a code, number or a person's name, return it unchanged.`;
 
 /** Translations being made right now, so two customers asking at once share one AI request. */
 const inFlight = new Map<string, Promise<void>>();
@@ -65,10 +66,22 @@ let warming = false;
  * sees English. Runs a few minutes after start-up and every few hours; only sends what is still missing,
  * slowly (one request every 20 s) so the AI assistant's daily limit is not used up. Stops for the day at the limit.
  */
+/** Bump when the translation rules change: texts that were left in English before are translated again. */
+const RULES_VERSION = '2';
+async function redoUntranslated() {
+  const meta = await prisma.translation.findUnique({ where: { lang_source: { lang: '_meta', source: 'rules' } } });
+  if (meta?.text === RULES_VERSION) return;
+  // Earlier rules kept frame names in English: forget every text that came back unchanged, so it is done again.
+  const n = await prisma.$executeRaw`DELETE FROM "Translation" WHERE "text" = "source" AND "lang" <> '_meta'`;
+  await prisma.translation.upsert({ where: { lang_source: { lang: '_meta', source: 'rules' } }, create: { lang: '_meta', source: 'rules', text: RULES_VERSION }, update: { text: RULES_VERSION } });
+  logger.info({ removed: n }, 'Translation rules updated: untranslated texts will be translated again');
+}
+
 export async function translateAppPhrases() {
   if (warming || !geminiKeys().length) return;
   warming = true;
   try {
+    await redoUntranslated();
     for (const lang of Object.keys(LANG_NAMES)) {
       const have = new Set((await prisma.translation.findMany({ where: { lang, source: { in: APP_PHRASES } }, select: { source: true } })).map((x) => x.source));
       const missing = APP_PHRASES.filter((t) => !have.has(t));

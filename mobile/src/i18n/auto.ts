@@ -76,7 +76,7 @@ const fill = (tpl: string, vals: string[]) => tpl.replace(/\{(\d)\}/g, (m, i) =>
 
 /** Text worth sending for translation: real words, not emails, links, codes or very long user text. */
 const worthAsking = (t: string) =>
-  t.length <= 400 && /[a-z]{2}/.test(t) && !/@|https?:|www\.|\.com\b|[\\/<>{}=;]{2,}/.test(t.replace(/\{\d\}/g, ''));
+  t.length <= 1500 && /[a-z]{2}/.test(t) && !/@|https?:|www\.|\.com\b|[\\/<>{}=;]{2,}/.test(t.replace(/\{\d\}/g, ''));
 
 function ask(lang: string, tpl: string) {
   if (!fetcher || !worthAsking(tpl)) return;
@@ -116,7 +116,7 @@ export function autoTr(lang: string, s: string): string {
   if (r === undefined) {
     for (const p of patterns) {
       const m = k.match(p.re);
-      if (m) { r = p.out.replace(/\{(\d)\}/g, (_, i) => { const v = m[Number(i) + 1]; return exact[v] ?? learned[lang]?.[v] ?? v; }); break; }
+      if (m) { r = p.out.replace(/\{(\d)\}/g, (_, i) => { const v = m[Number(i) + 1]; const got = exact[v] ?? learned[lang]?.[v]; if (got === undefined) ask(lang, v); return got ?? v; }); break; }   // a missing part (e.g. a colour in "Colour: {0}") is asked for too
     }
   }
   if (r === undefined) {
@@ -124,7 +124,8 @@ export function autoTr(lang: string, s: string): string {
     // Phone numbers, PIN codes and order references (6+ digits) are customer details: never sent anywhere.
     if (vals && /[A-Za-z]{2}/.test(t) && !/\d{6,}/.test(k.replace(/[\s-]/g, ''))) {
       const got = learned[lang]?.[t];
-      if (got !== undefined) r = fill(got, vals); else ask(lang, t);
+      if (got !== undefined) { r = fill(got, vals); if (got === t) ask(lang, t); }   // came back unchanged before (e.g. a frame name): check once more
+      else ask(lang, t);
     }
   }
   if (r === undefined) return s;
