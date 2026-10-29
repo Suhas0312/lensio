@@ -93,44 +93,144 @@ body.light-on{background:#fff}
 .shot img{max-width:100%;max-height:70vh;border-radius:14px}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:#151B4D;border:1px solid var(--line);padding:10px 16px;border-radius:12px;font-size:14px;opacity:0;transition:.2s;pointer-events:none;z-index:11;max-width:92vw}
 .toast.show{opacity:1}
+.i-back{--i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15 5l-7 7 7 7'/%3E%3C/svg%3E")}
+.i-cam{--i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 8.5h3.2L8 6h8l1.8 2.5H21V19H3z'/%3E%3Ccircle cx='12' cy='13.2' r='3.6'/%3E%3C/svg%3E")}
+.i-img{--i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='16' rx='2.5'/%3E%3Ccircle cx='9' cy='9.5' r='1.8'/%3E%3Cpath d='M21 15.5l-5-5-9.5 9.5'/%3E%3C/svg%3E")}
+.i-spark{--i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M11 3l1.9 5.1L18 10l-5.1 1.9L11 17l-1.9-5.1L4 10l5.1-1.9z'/%3E%3Cpath d='M18.5 14.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z'/%3E%3C/svg%3E")}
+.i-shot{--i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Ccircle cx='12' cy='12' r='4.2'/%3E%3C/svg%3E")}
+.i-bulb{--i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.4c.7.7 1 1.6 1 2.6h6c0-1 .3-1.9 1-2.6A6 6 0 0 0 12 3z'/%3E%3C/svg%3E")}
+.i-vol{--i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 9.5h3.5L12 6v12l-4.5-3.5H4z'/%3E%3Cpath d='M15.5 9.5a3.5 3.5 0 0 1 0 5M18 7a7 7 0 0 1 0 10'/%3E%3C/svg%3E")}
+.i-ruler{--i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='2.5' y='8' width='19' height='8' rx='1.6'/%3E%3Cpath d='M6.5 8v3M10 8v4M13.5 8v3M17 8v4'/%3E%3C/svg%3E")}
+.i-card{--i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='5.5' width='18' height='13' rx='2.2'/%3E%3Cpath d='M3 10h18M7 15h4'/%3E%3C/svg%3E")}
+.i-stop{--i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='6.5' y='6.5' width='11' height='11' rx='2'/%3E%3C/svg%3E")}
+.i-grid{--i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='4' y='4' width='7' height='7' rx='1.5'/%3E%3Crect x='13' y='4' width='7' height='7' rx='1.5'/%3E%3Crect x='4' y='13' width='7' height='7' rx='1.5'/%3E%3Crect x='13' y='13' width='7' height='7' rx='1.5'/%3E%3C/svg%3E")}
+.i-save{--i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 4v11M7 10.5l5 5 5-5M5 20h14'/%3E%3C/svg%3E")}
+.i-share{--i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 15V4M8 8l4-4 4 4M5 13v6.5h14V13'/%3E%3C/svg%3E")}
+.i-close{--i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 6l12 12M18 6L6 18'/%3E%3C/svg%3E")}
+.i-glasses{--i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='6.5' cy='14' r='3.6'/%3E%3Ccircle cx='17.5' cy='14' r='3.6'/%3E%3Cpath d='M10.1 14h3.8M2.9 13.5l1.4-6M21.1 13.5l-1.4-6'/%3E%3C/svg%3E")}
+.i-face{--i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M9 10h.01M15 10h.01M8.5 14.8a5 5 0 0 0 7 0'/%3E%3C/svg%3E")}
+.i-tag{--i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 12V4h8l10 10-8 8z'/%3E%3Ccircle cx='7.5' cy='8.5' r='1.2'/%3E%3C/svg%3E")}
+
+/* ===== Lensio premium layer (2026-10): glass panels, gradient edges, clean line icons ===== */
+body{background:radial-gradient(900px 520px at 12% -8%,rgba(123,97,255,.20),transparent 60%),radial-gradient(800px 480px at 100% 0,rgba(8,185,219,.13),transparent 60%),var(--night);background-attachment:fixed}
+.wrap{max-width:1180px}
+.ic{display:inline-block;width:18px;height:18px;flex:none;background:currentColor;-webkit-mask:var(--i) center/contain no-repeat;mask:var(--i) center/contain no-repeat;vertical-align:-3px}
+header{position:sticky;top:0;z-index:5;padding:12px 16px;background:rgba(4,7,34,.72);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid rgba(160,170,255,.10)}
+header h1{font-size:20px;font-weight:700;letter-spacing:-.2px}
+.iconbtn{width:40px;height:40px;display:grid;place-items:center;padding:0;border-radius:50%;background:rgba(21,27,77,.7);border:1px solid rgba(160,170,255,.18)}
+.iconbtn .ic{width:20px;height:20px}
+.seg{border:1px solid rgba(160,170,255,.22);background:rgba(21,27,77,.6);padding:3px;gap:2px}
+.seg button{border-radius:999px;padding:6px 16px;color:var(--muted)}
+.seg button.on{background:var(--grad);color:#fff;box-shadow:0 4px 14px rgba(123,97,255,.4)}
+.switch{-webkit-appearance:none;appearance:none;width:38px!important;height:22px!important;border-radius:999px;background:#252b63;position:relative;cursor:pointer;transition:background .2s;flex:none;margin:0}
+.switch::after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.4)}
+.switch:checked{background:var(--grad)}
+.switch:checked::after{transform:translateX(16px)}
+.toggle{gap:8px;color:var(--text);font-weight:600}
+.layout{padding:16px;gap:18px}
+@media (min-width:860px){.stagecol{flex:1.45}.side{max-width:400px}}
+.stage{border-radius:26px;border:1.5px solid transparent;background:radial-gradient(70% 60% at 50% 40%,rgba(123,97,255,.16),transparent 70%) padding-box,linear-gradient(#0B1036,#0B1036) padding-box,linear-gradient(135deg,rgba(8,185,219,.8),rgba(123,97,255,.8),rgba(201,78,242,.8)) border-box;box-shadow:0 24px 60px rgba(0,0,0,.45),0 0 0 1px rgba(255,255,255,.02)}
+.stage .photo{background:#0B1036}
+.stage .face{color:var(--muted)}
+.ph{display:flex;flex-direction:column;align-items:center;gap:12px;max-width:380px}
+.ph .ring{width:96px;height:96px;border-radius:50%;display:grid;place-items:center;color:#fff;background:linear-gradient(140deg,rgba(8,185,219,.35),rgba(123,97,255,.35),rgba(201,78,242,.3));border:1px solid rgba(170,180,255,.3);box-shadow:0 0 0 10px rgba(123,97,255,.08),0 0 0 22px rgba(123,97,255,.04),0 14px 40px rgba(123,97,255,.35)}
+.ph .ring .ic{width:46px;height:46px}
+.ph .phT{color:var(--text);font-size:19px;margin-top:10px}
+.ph p{margin:0;line-height:1.55;font-size:14px}
+.corner{position:absolute;width:34px;height:34px;border:2.5px solid rgba(8,185,219,.55);pointer-events:none;z-index:2}
+.corner.tl{top:18px;left:18px;border-right:0;border-bottom:0;border-top-left-radius:14px}
+.corner.tr{top:18px;right:18px;border-left:0;border-bottom:0;border-top-right-radius:14px}
+.corner.bl{bottom:18px;left:18px;border-right:0;border-top:0;border-bottom-left-radius:14px}
+.corner.br{bottom:18px;right:18px;border-left:0;border-top:0;border-bottom-right-radius:14px}
+.status{top:14px;background:rgba(4,7,34,.72);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(160,170,255,.18);padding:7px 16px}
+.btn{border:1px solid rgba(160,170,255,.24);background:rgba(21,27,77,.62);padding:12px 18px;gap:8px;justify-content:center;transition:transform .12s,box-shadow .2s,background .2s}
+.btn:hover:not(:disabled){background:rgba(32,40,104,.75)}
+.btn:active:not(:disabled){transform:scale(.97)}
+.btn.p{box-shadow:0 10px 26px rgba(123,97,255,.38)}
+.btn.p:hover:not(:disabled){filter:brightness(1.07)}
+.actions.main{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px;max-width:560px;margin-left:auto;margin-right:auto}
+.btn.big{padding:15px 18px;font-size:15px}
+.btn.big .ic{width:20px;height:20px}
+.dock{display:flex;justify-content:center;gap:6px;margin:12px auto 0;padding:6px;width:max-content;max-width:100%;border-radius:999px;background:rgba(12,17,56,.8);border:1px solid rgba(160,170,255,.16);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+.tool{display:inline-flex;align-items:center;gap:7px;font:700 13.5px var(--f);color:var(--text);background:transparent;border:0;border-radius:999px;padding:10px 16px;cursor:pointer;white-space:nowrap;transition:background .2s}
+.tool:hover:not(:disabled){background:rgba(123,97,255,.18)}
+.tool:disabled{opacity:.4;cursor:not-allowed}
+.tool.p,#measureBtn{background:linear-gradient(120deg,rgba(8,185,219,.25),rgba(123,97,255,.3))}
+.tool .ic{color:var(--cyan)}
+@media (max-width:420px){.tool{padding:9px 11px;font-size:12.5px}.actions.main{grid-template-columns:1fr}}
+.card{background:rgba(21,27,77,.5);border:1px solid rgba(160,170,255,.16);border-radius:20px;padding:16px 18px;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:0 12px 30px rgba(0,0,0,.25)}
+.ch{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.ch .ic{width:26px;height:26px;padding:5px;border-radius:50%;color:#fff;background-color:transparent;-webkit-mask:none;mask:none;background-image:none;position:relative}
+.ch .ic{background:linear-gradient(140deg,rgba(8,185,219,.4),rgba(123,97,255,.45));}
+.ch .ic::after{content:"";position:absolute;inset:5px;background:#fff;-webkit-mask:var(--i) center/contain no-repeat;mask:var(--i) center/contain no-repeat}
+.shape{font-size:16px;line-height:1.45}
+#sizeText{line-height:1.6}
+.chip{border:1px solid rgba(160,170,255,.24);background:rgba(21,27,77,.5);padding:8px 15px;transition:.15s}
+.chip.on{background:var(--grad);border-color:transparent;box-shadow:0 6px 18px rgba(123,97,255,.35)}
+.optrow{display:flex;gap:10px;align-items:center;margin-top:12px;color:var(--text)}
+.optrow .ic{color:var(--cyan)}
+.linkbtn{display:inline-flex;align-items:center;gap:6px;padding-top:12px;font-weight:600}
+.sel{border:1.5px solid transparent;background:linear-gradient(rgba(14,19,62,.92),rgba(14,19,62,.92)) padding-box,var(--grad) border-box}
+.sel b{font-size:17px}
+.sel .muted{display:block;margin-top:2px;line-height:1.5}
+.swatches{gap:12px}
+.sw{width:34px;height:34px;transition:transform .15s}
+.sw.on{border-color:transparent;box-shadow:inset 0 0 0 3px var(--night),0 0 0 2px #fff,0 0 14px rgba(123,97,255,.6);transform:scale(1.06)}
+.strip{gap:12px;padding:2px 2px 8px}
+.fr{width:124px;border-radius:16px;padding:10px 10px 8px;background:linear-gradient(180deg,#FFFFFF,#ECEEF9);box-shadow:0 8px 20px rgba(0,0,0,.28);transition:transform .15s,box-shadow .2s;border:2px solid transparent}
+.fr:hover{transform:translateY(-2px)}
+.fr.on{border-color:transparent;box-shadow:0 0 0 2.5px #7B61FF,0 10px 26px rgba(123,97,255,.45)}
+.fr img{height:52px}
+.fr .n{font-size:12.5px;margin-top:6px}
+.fr .pr{font-size:12px;font-weight:600;color:#4B5180}
+.report{border:1.5px solid transparent;background:linear-gradient(rgba(14,19,62,.92),rgba(14,19,62,.92)) padding-box,var(--grad) border-box}
+.pdbox,.toast{background:rgba(12,17,56,.96);border:1px solid rgba(160,170,255,.2);box-shadow:0 30px 80px rgba(0,0,0,.6)}
+.pdbox{border-radius:24px;padding:20px}
+.phead{display:inline-flex;align-items:center;gap:8px;font-size:17px}
+.num{border:1px solid rgba(160,170,255,.24);border-radius:12px;background:rgba(21,27,77,.6)}
+.shot{background:rgba(2,3,20,.94);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.shot img{border-radius:20px;box-shadow:0 24px 70px rgba(0,0,0,.6)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
-    <button class="iconbtn" id="back" aria-label="Back">←</button>
+    <button class="iconbtn" id="back" aria-label="Back"><i class="ic i-back" aria-hidden="true"></i></button>
     <h1>Try on</h1>
     <div class="seg" role="group" aria-label="Try-on view"><button type="button" id="v2d" class="on" aria-pressed="true">2D</button><button type="button" id="v3d" aria-pressed="false">3D</button></div>
-    <label class="toggle"><input type="checkbox" id="auto" checked> Auto-fit</label>
+    <label class="toggle"><input type="checkbox" id="auto" checked class="switch"> Auto-fit</label>
   </header>
   <div class="layout">
     <div class="stagecol">
       <div class="stage" id="stage">
-        <div class="face" id="placeholder"><div><div style="font-size:44px">👓</div><p>Turn on your camera, upload a photo from your gallery or files, or drop a photo here.<br>We'll place the frames on your face automatically.</p></div></div>
+        <div class="face" id="placeholder"><div class="ph"><div class="ring"><i class="ic i-glasses" aria-hidden="true"></i></div><b class="phT">See frames on your face</b><p>Turn on your camera, upload a photo from your gallery or files, or drop a photo here.<br>We'll place the frames on your face automatically.</p></div></div>
+        <i class="corner tl"></i><i class="corner tr"></i><i class="corner bl"></i><i class="corner br"></i>
         <video id="video" playsinline muted autoplay hidden></video>
         <img id="photo" class="photo" alt="Your photo" hidden>
         <img id="overlay" class="overlay" alt="" draggable="false">
         <div class="status" id="status">Loading try-on…</div>
       </div>
-      <div class="actions">
-        <button class="btn p" id="camBtn">📷 Live camera</button>
-        <button class="btn" id="selfieBtn">🖼️ Upload photo (gallery / files)</button>
-        <button class="btn p" id="measureBtn">✨ AI face scan</button>
-        <button class="btn" id="captureBtn" disabled>📸 Capture</button>
-        <button class="btn" id="lightBtn" type="button" title="Front light for dark rooms: lights up your face using the screen" aria-label="Front light: Auto">💡 Light: Auto</button>
+      <div class="actions main">
+        <button class="btn p big" id="camBtn"><i class="ic i-cam" aria-hidden="true"></i><span class="lbl">Live camera</span></button>
+        <button class="btn big" id="selfieBtn"><i class="ic i-img" aria-hidden="true"></i><span class="lbl">Upload photo</span></button>
         <input type="file" id="selfieIn" accept="image/*,.heic,.heif" hidden>
+      </div>
+      <div class="dock" role="group" aria-label="Tools">
+        <button class="tool" id="measureBtn"><i class="ic i-spark" aria-hidden="true"></i><span class="lbl">AI face scan</span></button>
+        <button class="tool" id="captureBtn" disabled><i class="ic i-shot" aria-hidden="true"></i><span class="lbl">Capture</span></button>
+        <button class="tool" id="lightBtn" type="button" title="Front light for dark rooms: lights up your face using the screen" aria-label="Front light: Auto"><i class="ic i-bulb" aria-hidden="true"></i><span class="lbl">Light: Auto</span></button>
       </div>
     </div>
     <div class="side">
       <div class="card report" id="report" hidden aria-live="polite"></div>
-      <div class="card" id="shapeCard"><span class="muted small">Face shape</span><div class="shape" id="shapeText">We'll suggest frames once we see your face.</div></div>
-      <div class="card" id="sizeCard"><span class="muted small">Frame size</span>
+      <div class="card" id="shapeCard"><div class="ch"><i class="ic i-face" aria-hidden="true"></i><span>Face shape</span></div><div class="shape" id="shapeText">We'll suggest frames once we see your face.</div></div>
+      <div class="card" id="sizeCard"><div class="ch"><i class="ic i-ruler" aria-hidden="true"></i><span>Frame size</span></div>
         <div id="sizeText" style="margin:4px 0 10px"></div>
         <div class="chips" id="sizeChips" role="group" aria-label="Frame size"></div>
-        <label class="small" style="display:flex;gap:8px;align-items:center;margin-top:8px"><input type="checkbox" id="voiceChk" checked> 🔊 Speak instructions while measuring</label>
-        <button class="linkbtn" id="exactBtn" type="button">📐 Exact size: enter the numbers from your current glasses</button>
-        <button class="btn" id="cardPdBtn" type="button" style="margin-top:8px;width:100%">💳 Precise PD with a card (±1 mm)</button>
+        <label class="small optrow"><input type="checkbox" id="voiceChk" checked class="switch"> <i class="ic i-vol" aria-hidden="true"></i> Speak instructions while measuring</label>
+        <button class="linkbtn" id="exactBtn" type="button"><i class="ic i-tag" aria-hidden="true"></i> Exact size: enter the numbers from your current glasses</button>
+        <button class="btn" id="cardPdBtn" type="button" style="margin-top:10px;width:100%"><i class="ic i-card" aria-hidden="true"></i><span class="lbl">Precise PD with a card (±1 mm)</span></button>
         <div id="exactBox" hidden style="margin-top:10px">
           <p class="muted small" style="margin:0 0 8px">Look inside the arm of glasses that fit you well. You'll see numbers like <b>52□18-140</b> (lens width, bridge, arm length).</p>
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
@@ -154,7 +254,7 @@ body.light-on{background:#fff}
 <div id="ringlight" aria-hidden="true"></div>
 <div class="pdtool" id="pdTool" role="dialog" aria-label="Precise PD with a card" hidden>
   <div class="pdbox">
-    <div class="pdhead"><b>💳 Precise PD with a card</b><button class="linkbtn" id="pdClose" type="button" aria-label="Close">✕</button></div>
+    <div class="pdhead"><b class="phead"><i class="ic i-card" aria-hidden="true"></i> Precise PD with a card</b><button class="iconbtn" id="pdClose" type="button" aria-label="Close"><i class="ic i-close" aria-hidden="true"></i></button></div>
     <div id="pdStep1">
       <ol class="small pdsteps">
         <li>Take off your glasses. Hold any bank, ATM or ID card <b>flat against your forehead</b>, just above your eyebrows, long side across.</li>
@@ -162,7 +262,7 @@ body.light-on{background:#fff}
         <li>Tap <b>Take photo</b> (3-second countdown), or use a photo from your gallery.</li>
       </ol>
       <p class="muted small">All bank/ID cards are exactly 85.6 mm wide (ISO standard), so the card gives a true millimetre scale. Nothing is uploaded.</p>
-      <div class="pdbtns"><button class="btn p" id="pdShoot" type="button">📸 Take photo</button><button class="btn" id="pdPick" type="button">🖼️ From gallery</button></div>
+      <div class="pdbtns"><button class="btn p" id="pdShoot" type="button"><i class="ic i-shot" aria-hidden="true"></i><span class="lbl">Take photo</span></button><button class="btn" id="pdPick" type="button"><i class="ic i-img" aria-hidden="true"></i><span class="lbl">From gallery</span></button></div>
       <input type="file" id="pdFile" accept="image/*" hidden>
     </div>
     <div id="pdStep2" hidden>
@@ -176,11 +276,11 @@ body.light-on{background:#fff}
 <div class="shot" id="shot" role="dialog" aria-label="Your try-on photo">
   <img id="shotImg" alt="Your try-on photo">
   <div class="actions">
-    <button class="btn" id="cmpBtn" type="button">🔲 Compare 4 frames</button>
-    <button class="btn p" id="saveBtn">💾 Save to gallery</button>
-    <button class="btn" id="shareBtn">Share</button>
-    <button class="btn" id="useShotBtn">📏 Use this photo for size &amp; frames</button>
-    <button class="btn" id="closeShot">Close</button>
+    <button class="btn" id="cmpBtn" type="button"><i class="ic i-grid" aria-hidden="true"></i><span class="lbl">Compare 4 frames</span></button>
+    <button class="btn p" id="saveBtn"><i class="ic i-save" aria-hidden="true"></i><span class="lbl">Save to gallery</span></button>
+    <button class="btn" id="shareBtn"><i class="ic i-share" aria-hidden="true"></i><span class="lbl">Share</span></button>
+    <button class="btn" id="useShotBtn"><i class="ic i-ruler" aria-hidden="true"></i><span class="lbl">Use this photo for size &amp; frames</span></button>
+    <button class="btn" id="closeShot"><i class="ic i-close" aria-hidden="true"></i><span class="lbl">Close</span></button>
   </div>
   <p class="muted small" style="text-align:center;max-width:420px;margin:0">“Use this photo” measures your face from it and shows the frames in your size. Take it facing the camera, without glasses.</p>
 </div>
@@ -189,6 +289,6 @@ body.light-on{background:#fff}
 <script src="/tryon/three/three.min.js" defer></script>
 <script src="/tryon/three/GLTFLoader.js" defer></script>
 <script src="/tryon/tryon3d.js?v=1" defer></script>
-<script src="/tryon/tryon.js?v=15" defer></script>
+<script src="/tryon/tryon.js?v=16" defer></script>
 </body>
 </html>

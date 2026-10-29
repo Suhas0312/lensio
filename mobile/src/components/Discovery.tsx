@@ -6,6 +6,7 @@ import { colors, radius, space } from '@/theme';
 import { useFeatures } from '@/lib/features';
 import { Text } from './UI';
 import { Key, useT } from '@/i18n';
+import { IconBadge, SectionHeader } from './Premium';
 
 const glass = { borderRadius: radius.md, borderWidth: 1, borderColor: 'rgba(160,170,255,0.16)', backgroundColor: 'rgba(21,27,77,0.62)' } as const;
 type Params = Record<string, string>;
@@ -25,12 +26,12 @@ export function ShopByOccasion() {
   const t = useT();
   return (
     <View style={{ gap: space(3) }}>
-      <Text v="heading">{t('shopByOccasion')}</Text>
+      <SectionHeader title={t('shopByOccasion')} />
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space(3) }}>
         {OCCASIONS.map((o) => (
           <Pressable key={o.title} onPress={() => router.push({ pathname: '/shop', params: o.params })} accessibilityRole="button" accessibilityLabel={`${t(o.title)}: ${t(o.sub)}`}
             style={({ pressed }) => [glass, { width: 150, padding: space(3), gap: space(1), transform: [{ scale: pressed ? 0.96 : 1 }] }]}>
-            <Ionicons name={o.icon} size={24} color={colors.cyan} />
+            <IconBadge icon={o.icon} size={42} />
             <Text v="bodyStrong">{t(o.title)}</Text>
             <Text v="caption" color={colors.muted}>{t(o.sub)}</Text>
           </Pressable>

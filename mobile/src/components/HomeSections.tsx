@@ -11,9 +11,10 @@ import { useRecent } from '@/lib/recent';
 import { useFeatures } from '@/lib/features';
 import { colors, gradient, radius, space } from '@/theme';
 import { Key, useT } from '@/i18n';
+import { IconBadge, SectionHeader } from './Premium';
 
 const open = (link: string) => { if (!link) return; if (link.startsWith('/')) router.push(link as never); else Linking.openURL(link); };
-const glass = { backgroundColor: 'rgba(21,27,77,0.62)', borderWidth: 1, borderColor: 'rgba(160,170,255,0.16)', borderRadius: radius.md } as const;
+const glass = { backgroundColor: 'rgba(21,27,77,0.55)', borderWidth: 1, borderColor: 'rgba(160,170,255,0.18)', borderRadius: radius.lg } as const;
 
 interface Banner { id: string; title: string; text: string; cta: string; link: string; imageDesktop: string | null; imageMobile: string | null; alt: string; videoDesktop?: string | null; videoMobile?: string | null; textInImage?: boolean; sound?: boolean; audio?: string | null; fit?: 'fill' | 'whole'; focus?: 'center' | 'top' | 'bottom' }
 type Fit = { fit?: 'fill' | 'whole'; focus?: 'center' | 'top' | 'bottom' };
@@ -191,12 +192,7 @@ export function HomeBanners({ width }: { width: number }) {
 }
 
 function SectionTitle({ title, action, onAction }: { title: string; action?: string; onAction?: () => void }) {
-  return (
-    <Row style={{ justifyContent: 'space-between' }}>
-      <Text v="title">{title}</Text>
-      {action ? <Pressable onPress={onAction} accessibilityRole="link"><Text v="caption" color={colors.cyan}>{action}</Text></Pressable> : null}
-    </Row>
-  );
+  return <SectionHeader title={title} action={action} onAction={onAction} />;
 }
 
 const SHAPES: [string, Key][] = [['RECTANGLE', 'shapeRectangle'], ['ROUND', 'shapeRound'], ['CAT_EYE', 'shapeCatEye'], ['AVIATOR', 'shapeAviator'], ['WAYFARER', 'shapeWayfarer'], ['SQUARE', 'shapeSquare'], ['OVAL', 'shapeOval'], ['GEOMETRIC', 'shapeGeometric']];
@@ -263,9 +259,9 @@ export function Collections() {
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space(3) }}>
         {COLLECTIONS.map((c) => (
           <Pressable key={c.t} onPress={() => router.push({ pathname: '/shop', params: c.params })} accessibilityRole="button"
-            style={({ pressed }) => [{ flexBasis: '30%', flexGrow: 1, minWidth: 100, padding: space(3), flexDirection: 'row', alignItems: 'center', gap: space(2), transform: [{ scale: pressed ? 0.97 : 1 }] }, glass]}>
-            <Ionicons name={c.icon} size={22} color={colors.cyan} />
-            <Text v="bodyStrong">{t(c.t)}</Text>
+            style={({ pressed }) => [{ flexBasis: '30%', flexGrow: 1, minWidth: 100, padding: space(2.5), paddingRight: space(3), flexDirection: 'row', alignItems: 'center', gap: space(2.5), transform: [{ scale: pressed ? 0.97 : 1 }] }, glass]}>
+            <IconBadge icon={c.icon} size={38} />
+            <Text v="bodyStrong" numberOfLines={1} style={{ flexShrink: 1 }}>{t(c.t)}</Text>
           </Pressable>
         ))}
       </View>

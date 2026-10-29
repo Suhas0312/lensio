@@ -12,6 +12,8 @@
     else if (EMBED && window.parent !== window) window.parent.postMessage({ lensio: true, ...msg }, location.origin);
   };
   const inr = (p) => '₹' + Math.round(p / 100).toLocaleString('en-IN');
+  // Change a button's words but keep its icon (and optionally switch the icon).
+  const setBtn = (sel, text, icon) => { const b = typeof sel === 'string' ? $(sel) : sel; if (!b) return; const l = b.querySelector('.lbl'); if (l) l.textContent = text; else b.textContent = text; if (icon) { const i = b.querySelector('.ic'); if (i) i.className = 'ic i-' + icon; } };
   const toast = (m) => { const t = $('#toast'); t.textContent = m; t.classList.add('show'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 3000); };
   const status = (html) => { $('#status').innerHTML = html; };
 
@@ -406,7 +408,7 @@
   function applyLight() {
     clearInterval(light.timer); light.timer = null;
     const label = { auto: 'Auto', on: 'On', off: 'Off' }[light.mode];
-    $('#lightBtn').textContent = `💡 Light: ${label}`; $('#lightBtn').setAttribute('aria-label', `Front light: ${label}`);
+    setBtn('#lightBtn', `Light: ${label}`); $('#lightBtn').setAttribute('aria-label', `Front light: ${label}`);
     $('#lightBtn').classList.toggle('p', light.mode === 'on');
     if (light.mode === 'on') setLight(S.mode === 'live');
     else if (light.mode === 'off') setLight(false);
@@ -449,7 +451,7 @@
     }
     video.srcObject = S.stream; video.hidden = false; photo.hidden = true; $('#placeholder').hidden = true;
     S.mode = 'live'; S.face = null; S.manual = null; S.misses = 0; S.following = null; resetShape();
-    $('#camBtn').textContent = '⏹ Stop camera';
+    setBtn('#camBtn', 'Stop camera', 'stop');
     if (light.mode === 'on') setLight(true);
     status('Loading face detection…');
     await video.play().catch(() => {});
@@ -460,7 +462,7 @@
     clearInterval(loopT);
     setLight(false);
     if (S.stream) { S.stream.getTracks().forEach((t) => t.stop()); S.stream = null; }
-    video.hidden = true; $('#camBtn').textContent = '📷 Live camera';
+    video.hidden = true; setBtn('#camBtn', 'Live camera', 'cam');
     if (S.mode === 'live') { S.mode = 'none'; $('#placeholder').hidden = false; overlay.style.display = 'none'; status('Turn on the camera or upload a selfie'); }
   }
   async function useSelfie(file) {
@@ -786,7 +788,7 @@
     g.fillStyle = 'rgba(4,7,34,.6)'; g.fillRect(W - 150, H - 30, 142, 22);
     g.fillStyle = '#fff'; g.font = '600 12px Quicksand, sans-serif'; g.fillText(`Lensio · ${S.sel ? S.sel.name : ''}`.slice(0, 26), W - 144, H - 15);
     lastShot = singleShot = c.toDataURL('image/jpeg', 0.92);
-    $('#cmpBtn').textContent = '🔲 Compare 4 frames'; $('#cmpBtn').dataset.on = '';
+    setBtn('#cmpBtn', 'Compare 4 frames', 'grid'); $('#cmpBtn').dataset.on = '';
     $('#cmpBtn').hidden = orderedFrames().length < 2;
     // The plain photo (no frame drawn on it), for "Use this photo for size & frames"
     lastRaw = null;
@@ -798,7 +800,7 @@
     $('#useShotBtn').hidden = !lastRaw;
     $('#shotImg').src = lastShot; $('#shot').style.display = 'flex';
     // Show the 4-frame comparison straight away (one tap on the button switches back to one frame).
-    const cb = $('#cmpBtn'); cb.dataset.on = ''; cb.textContent = '🔲 Compare 4 frames';
+    const cb = $('#cmpBtn'); cb.dataset.on = ''; setBtn(cb, 'Compare 4 frames', 'grid');
     if (S.frames.length > 1) cb.click();
   }
   async function share() {
@@ -855,12 +857,12 @@
   $('#useShotBtn').addEventListener('click', useShot);
   $('#cmpBtn').addEventListener('click', async () => {
     const b = $('#cmpBtn');
-    if (b.dataset.on) { lastShot = singleShot; b.dataset.on = ''; b.textContent = '🔲 Compare 4 frames'; }
+    if (b.dataset.on) { lastShot = singleShot; b.dataset.on = ''; setBtn(b, 'Compare 4 frames', 'grid'); }
     else {
-      b.disabled = true; b.textContent = 'Making comparison…';
+      b.disabled = true; setBtn(b, 'Making comparison…');
       const url = await compareShot(); b.disabled = false;
-      if (!url) { b.textContent = '🔲 Compare 4 frames'; return; }
-      lastShot = url; b.dataset.on = '1'; b.textContent = '👓 Show one frame';
+      if (!url) { setBtn(b, 'Compare 4 frames', 'grid'); return; }
+      lastShot = url; b.dataset.on = '1'; setBtn(b, 'Show one frame', 'glasses');
     }
     $('#shotImg').src = lastShot;
   });
