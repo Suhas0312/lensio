@@ -16,15 +16,21 @@ export const isNewer = (a: string, b: string) => {
   return false;
 };
 
-/** Where the automatic release robot (.github/workflows/android-release.yml) publishes the app. */
-export const DEFAULT_RELEASE_REPO = process.env.ANDROID_RELEASE_REPO || 'Suhas0312/lensio';
+/**
+ * Where the automatic release robot (.github/workflows/android-release.yml) publishes the app.
+ * The code lives in a PRIVATE repo (Suhas0312/lensio); only the finished APKs go to this small PUBLIC repo,
+ * so customers can download the app while the code stays hidden.
+ */
+export const DEFAULT_RELEASE_REPO = process.env.ANDROID_RELEASE_REPO || 'Suhas0312/lensio-app';
+/** The private code repo: its releases can't be read once it is private, so it is never used for downloads. */
+const PRIVATE_CODE_REPO = 'Suhas0312/lensio';
 
 /**
  * The GitHub repo to read app releases from: the admin setting if filled in, otherwise the repo the
  * release robot publishes to. No admin step is needed for automatic releases.
  */
 export function releaseRepo(explicit: string | null, _apkUrl?: string | null) {
-  if (explicit && /^[\w.-]+\/[\w.-]+$/.test(explicit)) return explicit;
+  if (explicit && /^[\w.-]+\/[\w.-]+$/.test(explicit) && explicit.toLowerCase() !== PRIVATE_CODE_REPO.toLowerCase()) return explicit;
   return /^[\w.-]+\/[\w.-]+$/.test(DEFAULT_RELEASE_REPO) ? DEFAULT_RELEASE_REPO : null;
 }
 

@@ -11,7 +11,7 @@ export interface ShopSettings {
   androidLatestVersion: string | null; // e.g. 1.0.1; the app shows "Update available" when it's older
   androidMinVersion: string | null;    // apps older than this must update before they can be used
   androidUpdateNotes: string | null;   // "What's new", shown in the app's update window
-  androidReleaseRepo: string | null;   // GitHub repo with the APK releases (e.g. Suhas0312/lensio); read automatically
+  androidReleaseRepo: string | null;   // GitHub repo with the APK releases (e.g. Suhas0312/lensio-app, the public downloads repo); read automatically
   shopInfo: string | null;             // free text for the AI assistant: returns, hours, address, delivery areas
   instagramUrl: string | null;         // shown in the app, download page and assistant
   // Automation

@@ -637,7 +637,7 @@
         <div id="aiTest" class="small" style="margin-top:8px"></div></div>
       <div class="card"><h2>Android app download</h2>
         ${releaseStatus(S.data.release)}
-        <label>GitHub repo with your app releases (automatic updates)<input id="setRepo" placeholder="Suhas0312/lensio" value="${esc(s.androidReleaseRepo || '')}" style="max-width:280px"></label>
+        <label>GitHub repo with your app releases (automatic updates)<input id="setRepo" placeholder="Suhas0312/lensio-app" value="${esc(s.androidReleaseRepo || '')}" style="max-width:280px"></label>
         <p class="muted small">New versions are automatic: raise the version in mobile/app.json, upload to GitHub, and about 30 minutes later GitHub publishes the release; within 5 minutes the download page, the permanent link and the customers' update window switch to it. Nothing else to change here. Leave empty to use the GitHub repo from the link below. The fields below are only a fallback.</p>
         <details><summary class="small">Backup settings (used only if GitHub can't be reached; kept up to date automatically)</summary>
         <label>APK download link<input id="setApk" placeholder="https://pub-….r2.dev/lensio-1.0.0.apk" value="${esc(s.androidApkUrl || '')}"></label>

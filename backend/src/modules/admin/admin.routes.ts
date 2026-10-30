@@ -532,7 +532,7 @@ r.put('/settings', adminOnly, validate(z.object({
   androidLatestVersion: z.string().trim().regex(/^\d+\.\d+\.\d+$/, 'Version looks like 1.0.1').nullable().optional().or(z.literal('').transform(() => null)),
   androidMinVersion: z.string().trim().regex(/^\d+\.\d+\.\d+$/, 'Minimum version looks like 1.0.1').nullable().optional().or(z.literal('').transform(() => null)),
   androidUpdateNotes: z.string().trim().max(600).nullable().optional().or(z.literal('').transform(() => null)),
-  androidReleaseRepo: z.string().trim().regex(/^[\w.-]+\/[\w.-]+$/, 'Type it like Suhas0312/lensio').nullable().optional().or(z.literal('').transform(() => null)),
+  androidReleaseRepo: z.string().trim().regex(/^[\w.-]+\/[\w.-]+$/, 'Type it like Suhas0312/lensio-app').nullable().optional().or(z.literal('').transform(() => null)),
   loyaltyEnabled: z.boolean().optional(), loyaltyPointsPer100: z.number().int().min(0).max(1000).optional(),
   loyaltyMaxRedeemPercent: z.number().int().min(0).max(100).optional(), reviewsAutoApprove: z.boolean().optional(),
 })), ah(async (req, res) => { res.json(await saveSettings(req.body)); }));
